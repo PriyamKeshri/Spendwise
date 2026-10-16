@@ -32,15 +32,20 @@ Spendwise does the bookkeeping for you, privately, on your phone.
 
 ## Install
 
-**Download:** get the APK from the [latest release](https://github.com/PriyamKeshri/Spendwise/releases/latest), open it on your phone and allow installs from that app. Play Protect may warn because the app isn't from the Play Store; choose **Install anyway**. If Android then won't grant SMS access, open App info → ⋮ → **Allow restricted settings** first.
+> **Blocked by Play Protect?** In India and some other countries, Play Protect blocks apps that ask for SMS access when they're installed from a browser or file manager, and there's no "Install anyway" option. Installing over USB isn't affected.
 
-**From source, over USB:**
+**Over USB (recommended)**
 
-1. On the phone, open Settings → About phone and tap **Build number** 7 times, then turn on **USB debugging**.
+1. On the phone, open Settings → About phone and tap **Build number** 7 times, then turn on **USB debugging** in Developer options. On Xiaomi, Redmi or POCO, also turn on **Install via USB**.
 2. Connect it to your computer and tap **Allow** on the prompt.
-3. Run `./install-on-phone.sh`, pick how far back to read, and allow SMS access.
+3. Run `./install-on-phone.sh` from this repo, or `adb install Spendwise-v1.0.apk` with the APK from the [latest release](https://github.com/PriyamKeshri/Spendwise/releases/latest).
 
-> On Xiaomi, Redmi or POCO phones, also turn on **Install via USB**.
+**From the download**
+
+1. In the Play Store, tap your profile picture → **Play Protect** → ⚙ and turn off **Scan apps with Play Protect**.
+2. Install the APK from the [latest release](https://github.com/PriyamKeshri/Spendwise/releases/latest), then turn scanning back on.
+
+Then open Spendwise, choose how far back to read, and allow SMS access. If Android won't grant it, open App info → ⋮ → **Allow restricted settings** first.
 
 ## Tech stack
 
