@@ -88,7 +88,7 @@ fun OnboardingScreen(hasPermission: Boolean, onStart: (months: Int) -> Unit) {
         Text("Your spending, sorted automatically", style = MaterialTheme.typography.headlineLarge)
         Spacer(Modifier.height(10.dp))
         Text(
-            "Expense Tracker reads the alerts your bank sends by SMS and turns them into a monthly picture " +
+            "Spendwise reads the alerts your bank sends by SMS and turns them into a monthly picture " +
                 "of where your money goes.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

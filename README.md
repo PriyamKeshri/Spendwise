@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/icon.svg" width="88" alt="Expense Tracker icon">
+<img src="docs/icon.svg" width="88" alt="Spendwise icon">
 
-# Expense Tracker
+# Spendwise
 
 **Turns your bank SMS into a monthly picture of where your money goes.**<br>
 Private by design · Tuned for SBI and other Indian banks
