@@ -11,6 +11,8 @@ Private by design · Tuned for SBI and other Indian banks
 ![Kotlin 2.0](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)
 ![No internet permission](https://img.shields.io/badge/internet%20permission-none-5B4BDB)
+[![MIT licence](https://img.shields.io/badge/licence-MIT-0E9F6E)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/PriyamKeshri/Spendwise?label=download&color=5B4BDB)](https://github.com/PriyamKeshri/Spendwise/releases/latest)
 
 <img src="docs/screenshots/overview-dark.png" width="24%" alt="Overview with the month's total and a six-month trend">
 <img src="docs/screenshots/breakdown-dark.png" width="24%" alt="Spending split by category">
@@ -28,13 +30,17 @@ Private by design · Tuned for SBI and other Indian banks
 - **No double counting**: credit card bill payments (CRED included) and transfers between your own accounts stay out of totals.
 - **Private**: messages are read and stored only on the phone. The app has no internet permission.
 
-## Install on your phone
+## Install
+
+**Download:** get the APK from the [latest release](https://github.com/PriyamKeshri/Spendwise/releases/latest), open it on your phone and allow installs from that app. Play Protect may warn because the app isn't from the Play Store; choose **Install anyway**. If Android then won't grant SMS access, open App info → ⋮ → **Allow restricted settings** first.
+
+**From source, over USB:**
 
 1. On the phone, open Settings → About phone and tap **Build number** 7 times, then turn on **USB debugging**.
 2. Connect it to your computer and tap **Allow** on the prompt.
 3. Run `./install-on-phone.sh`, pick how far back to read, and allow SMS access.
 
-> On Xiaomi, Redmi or POCO phones, also turn on **Install via USB**. If you install the APK file directly instead, Android may block SMS access until you open App info → ⋮ → **Allow restricted settings**.
+> On Xiaomi, Redmi or POCO phones, also turn on **Install via USB**.
 
 ## Tech stack
 
@@ -70,10 +76,11 @@ flowchart LR
 ```bash
 ./gradlew testDebugUnitTest   # parser and categorizer tests
 ./gradlew assembleDebug       # APK in app/build/outputs/apk/debug/
+./gradlew assembleRelease     # smaller, optimised APK in app/build/outputs/apk/release/
 ```
 
 Needs JDK 17 and the Android SDK (compile SDK 35, min SDK 26). When a bank message isn't recognised, add it as a case in `SmsParserTest.kt` and adjust `SmsParser.kt` until it passes. Category keywords live in `DefaultCategories.kt`.
 
-## Credits
+## Licence
 
-Plus Jakarta Sans © The Plus Jakarta Sans Project Authors, under the [SIL Open Font License 1.1](app/src/main/assets/licenses/plus_jakarta_sans_OFL.txt).
+Spendwise is released under the [MIT Licence](LICENSE). The bundled Plus Jakarta Sans font is © The Plus Jakarta Sans Project Authors, under the [SIL Open Font License 1.1](app/src/main/assets/licenses/plus_jakarta_sans_OFL.txt).
