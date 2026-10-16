@@ -4,8 +4,8 @@
 
 # Spendwise
 
-**Turns your bank SMS into a monthly picture of where your money goes.**<br>
-Private by design · Tuned for SBI and other Indian banks
+**Know where your money went without lifting a finger.**<br>
+Spendwise does the bookkeeping for you, privately, on your phone.
 
 ![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin 2.0](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)
