@@ -12,10 +12,10 @@ Private by design · Tuned for SBI and other Indian banks
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)
 ![No internet permission](https://img.shields.io/badge/internet%20permission-none-5B4BDB)
 
-<img src="docs/screenshots/overview-dark.png" width="190" alt="Overview with the month's total and a six-month trend">
-<img src="docs/screenshots/breakdown-dark.png" width="190" alt="Spending split by category">
-<img src="docs/screenshots/transactions-light.png" width="190" alt="Transactions grouped by day">
-<img src="docs/screenshots/details-light.png" width="190" alt="Transaction details with the category picker">
+<img src="docs/screenshots/overview-dark.png" width="24%" alt="Overview with the month's total and a six-month trend">
+<img src="docs/screenshots/breakdown-dark.png" width="24%" alt="Spending split by category">
+<img src="docs/screenshots/transactions-light.png" width="24%" alt="Transactions grouped by day">
+<img src="docs/screenshots/details-light.png" width="24%" alt="Transaction details with the category picker">
 
 </div>
 
