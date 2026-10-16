@@ -23,12 +23,6 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE timestamp >= :start AND timestamp < :end ORDER BY timestamp DESC")
     fun observeBetween(start: Long, end: Long): Flow<List<TransactionEntity>>
 
-    @Query(
-        "SELECT COALESCE(SUM(amount_paise), 0) FROM transactions " +
-            "WHERE type = 'DEBIT' AND excluded = 0 AND timestamp >= :start AND timestamp < :end",
-    )
-    fun observeSpentBetween(start: Long, end: Long): Flow<Long>
-
     @Query("SELECT * FROM transactions WHERE id = :id")
     fun observeById(id: Long): Flow<TransactionEntity?>
 

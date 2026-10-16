@@ -2,43 +2,40 @@ package com.expensetracker.ui.categories
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -48,9 +45,11 @@ import com.expensetracker.data.db.CategoryEntity
 import com.expensetracker.data.db.CategoryIds
 import com.expensetracker.data.db.MerchantRuleEntity
 import com.expensetracker.model.CategoryKind
-import com.expensetracker.ui.components.CategoryAvatar
+import com.expensetracker.ui.components.AppCard
+import com.expensetracker.ui.components.CategoryTile
+import com.expensetracker.ui.components.PillToggle
+import com.expensetracker.ui.components.ScreenTitle
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoriesScreen(viewModel: CategoriesViewModel = hiltViewModel()) {
     val categories by viewModel.categories.collectAsStateWithLifecycle()
@@ -58,36 +57,39 @@ fun CategoriesScreen(viewModel: CategoriesViewModel = hiltViewModel()) {
     var editing by remember { mutableStateOf<CategoryEntity?>(null) }
     val byId = categories.associateBy { it.id }
 
-    Scaffold(
-        topBar = { TopAppBar(title = { Text("Categories") }) },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { editing = newCategory() },
-                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text("New category") },
-            )
-        },
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-    ) { padding ->
+    Box(Modifier.fillMaxSize()) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = 96.dp),
+            modifier = Modifier.fillMaxSize().statusBarsPadding(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 104.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            item { SectionHeader("Spending", "Matched against the merchant name. Unmatched spending goes to Others.") }
-            items(categories.filter { it.kind == CategoryKind.EXPENSE }, key = { it.id }) { category ->
-                CategoryRow(category) { editing = category }
+            item { ScreenTitle("Categories", Modifier.padding(start = 4.dp)) }
+            item { SectionHeader("Spending", "Matched against the merchant name. Anything unmatched goes to Others.") }
+            item {
+                CategoryGroup(categories.filter { it.kind == CategoryKind.EXPENSE }) { editing = it }
             }
             item { SectionHeader("Income", "Matched against the sender and the message text.") }
-            items(categories.filter { it.kind == CategoryKind.INCOME }, key = { it.id }) { category ->
-                CategoryRow(category) { editing = category }
+            item {
+                CategoryGroup(categories.filter { it.kind == CategoryKind.INCOME }) { editing = it }
             }
             if (rules.isNotEmpty()) {
                 item { SectionHeader("Merchants you've sorted", "These win over keywords. Remove one to go back to automatic.") }
-                items(rules, key = { "rule-${it.merchantKey}" }) { rule ->
-                    RuleRow(rule, byId[rule.categoryId]) { viewModel.forget(rule) }
+                item {
+                    AppCard(contentPadding = PaddingValues(vertical = 6.dp)) {
+                        rules.forEachIndexed { index, rule ->
+                            if (index > 0) RowDivider()
+                            RuleRow(rule, byId[rule.categoryId]) { viewModel.forget(rule) }
+                        }
+                    }
                 }
             }
         }
+        ExtendedFloatingActionButton(
+            onClick = { editing = newCategory() },
+            icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
+            text = { Text("New category") },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+        )
     }
 
     editing?.let { category ->
@@ -121,9 +123,27 @@ private fun newCategory() = CategoryEntity(
 
 @Composable
 private fun SectionHeader(title: String, subtitle: String) {
-    Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp)) {
-        Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+    Column(Modifier.padding(start = 6.dp, end = 6.dp, top = 16.dp, bottom = 4.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium)
         Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun RowDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 74.dp, end = 16.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+    )
+}
+
+@Composable
+private fun CategoryGroup(categories: List<CategoryEntity>, onEdit: (CategoryEntity) -> Unit) {
+    AppCard(contentPadding = PaddingValues(vertical = 6.dp)) {
+        categories.forEachIndexed { index, category ->
+            if (index > 0) RowDivider()
+            CategoryRow(category) { onEdit(category) }
+        }
     }
 }
 
@@ -136,27 +156,51 @@ private fun CategoryRow(category: CategoryEntity, onClick: () -> Unit) {
         else -> category.keywords.take(5).joinToString(", ") +
             if (category.keywords.size > 5) " +${category.keywords.size - 5} more" else ""
     }
-    ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
-        leadingContent = { CategoryAvatar(category) },
-        headlineContent = { Text(category.name) },
-        supportingContent = { Text(description, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-    )
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CategoryTile(category)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(category.name, style = MaterialTheme.typography.titleSmall)
+            Text(
+                description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 @Composable
 private fun RuleRow(rule: MerchantRuleEntity, category: CategoryEntity?, onForget: () -> Unit) {
-    ListItem(
-        leadingContent = { CategoryAvatar(category) },
-        headlineContent = { Text(rule.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        supportingContent = { Text("→ ${category?.name ?: "Deleted category"}") },
-        trailingContent = {
-            IconButton(onClick = onForget) { Icon(Icons.Filled.Close, contentDescription = "Forget ${rule.label}") }
-        },
-    )
+    Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CategoryTile(category)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(rule.label, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                "Always ${category?.name ?: "a deleted category"}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        IconButton(onClick = onForget) {
+            Icon(Icons.Rounded.Close, contentDescription = "Forget ${rule.label}")
+        }
+    }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CategoryEditor(
     initial: CategoryEntity,
@@ -178,14 +222,18 @@ private fun CategoryEditor(
                 Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        value = emoji,
-                        onValueChange = { emoji = it.take(8) },
-                        label = { Text("Icon") },
-                        singleLine = true,
-                        modifier = Modifier.width(76.dp),
-                    )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (initial.isSystem) {
+                        CategoryTile(initial, size = 52.dp)
+                    } else {
+                        OutlinedTextField(
+                            value = emoji,
+                            onValueChange = { emoji = it.take(8) },
+                            label = { Text("Emoji") },
+                            singleLine = true,
+                            modifier = Modifier.width(84.dp),
+                        )
+                    }
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it },
@@ -195,15 +243,12 @@ private fun CategoryEditor(
                     )
                 }
                 if (isNew) {
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        CategoryKind.entries.forEachIndexed { index, option ->
-                            SegmentedButton(
-                                selected = kind == option,
-                                onClick = { kind = option },
-                                shape = SegmentedButtonDefaults.itemShape(index, CategoryKind.entries.size),
-                            ) { Text(if (option == CategoryKind.EXPENSE) "Spending" else "Income") }
-                        }
-                    }
+                    PillToggle(
+                        options = listOf("Spending", "Income"),
+                        selected = if (kind == CategoryKind.EXPENSE) 0 else 1,
+                        onSelect = { kind = if (it == 0) CategoryKind.EXPENSE else CategoryKind.INCOME },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
                 OutlinedTextField(
                     value = keywords,
@@ -218,8 +263,9 @@ private fun CategoryEditor(
                         onClick = onDelete,
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                     ) {
-                        Icon(Icons.Filled.Delete, contentDescription = null)
-                        Text("  Delete category")
+                        Icon(Icons.Rounded.Delete, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Delete category")
                     }
                 }
             }

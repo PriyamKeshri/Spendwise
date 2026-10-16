@@ -11,6 +11,7 @@ import com.expensetracker.model.TxnType
 import com.expensetracker.sms.SyncScheduler
 import com.expensetracker.sms.SyncStatus
 import com.expensetracker.ui.SharedFilters
+import com.expensetracker.ui.components.TrendPoint
 import com.expensetracker.util.toLocalDate
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,10 +20,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
+import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneId
 import javax.inject.Inject
 
-data class CategoryShare(val category: CategoryEntity, val amountPaise: Long, val share: Float)
+data class CategoryShare(val category: CategoryEntity, val amountPaise: Long, val share: Float, val count: Int)
 
 data class DashboardUiState(
     val month: YearMonth = YearMonth.now(),
@@ -31,9 +34,13 @@ data class DashboardUiState(
     val receivedPaise: Long = 0,
     val previousSpentPaise: Long = 0,
     val expenseCount: Int = 0,
+    /** Spending for the selected month and the five before it, oldest first. */
+    val trend: List<TrendPoint> = emptyList(),
     val spending: List<CategoryShare> = emptyList(),
     val income: List<CategoryShare> = emptyList(),
     val daily: List<Long> = emptyList(),
+    val dailyAveragePaise: Long = 0,
+    val biggestExpense: TransactionEntity? = null,
     val recent: List<TransactionEntity> = emptyList(),
     val categories: Map<Long, CategoryEntity> = emptyMap(),
     val hasTransactions: Boolean = false,
@@ -52,10 +59,9 @@ class DashboardViewModel @Inject constructor(
 
     private val monthSummary = filters.month.flatMapLatest { month ->
         combine(
-            repository.transactionsIn(month),
-            repository.spentIn(month.minusMonths(1)),
+            repository.transactionsBetween(month.minusMonths(TREND_MONTHS - 1L), month),
             repository.categories,
-        ) { transactions, previousSpent, categories -> summarize(month, transactions, previousSpent, categories) }
+        ) { transactions, categories -> summarize(month, transactions, categories) }
     }
 
     val state: StateFlow<DashboardUiState> =
@@ -79,36 +85,52 @@ class DashboardViewModel @Inject constructor(
 
     private fun summarize(
         month: YearMonth,
-        transactions: List<TransactionEntity>,
-        previousSpent: Long,
+        window: List<TransactionEntity>,
         categories: List<CategoryEntity>,
     ): DashboardUiState {
+        val zone = ZoneId.systemDefault()
+        val byMonth = window.groupBy { YearMonth.from(it.timestamp.toLocalDate(zone)) }
+        val transactions = byMonth[month].orEmpty()
         val byId = categories.associateBy { it.id }
+
         val counted = transactions.filterNot { it.excluded }
         val debits = counted.filter { it.type == TxnType.DEBIT }
         val credits = counted.filter { it.type == TxnType.CREDIT }
+        val spent = debits.sumOf { it.amountPaise }
+
+        val trend = (TREND_MONTHS - 1 downTo 0).map { back ->
+            val m = month.minusMonths(back.toLong())
+            TrendPoint(m, byMonth[m].orEmpty().spentPaise())
+        }
 
         val daily = LongArray(month.lengthOfMonth())
         for (txn in debits) {
-            val day = txn.timestamp.toLocalDate().dayOfMonth - 1
+            val day = txn.timestamp.toLocalDate(zone).dayOfMonth - 1
             if (day in daily.indices) daily[day] += txn.amountPaise
         }
+        val daysSoFar = if (month == YearMonth.now()) LocalDate.now().dayOfMonth else month.lengthOfMonth()
 
         return DashboardUiState(
             month = month,
             loading = false,
-            spentPaise = debits.sumOf { it.amountPaise },
+            spentPaise = spent,
             receivedPaise = credits.sumOf { it.amountPaise },
-            previousSpentPaise = previousSpent,
+            previousSpentPaise = trend.getOrNull(trend.size - 2)?.spentPaise ?: 0,
             expenseCount = debits.size,
+            trend = trend,
             spending = shares(debits, byId, CategoryIds.OTHERS),
             income = shares(credits, byId, CategoryIds.OTHER_INCOME),
             daily = daily.toList(),
+            dailyAveragePaise = spent / daysSoFar.coerceAtLeast(1),
+            biggestExpense = debits.maxByOrNull { it.amountPaise },
             recent = transactions.take(5),
             categories = byId,
             hasTransactions = transactions.isNotEmpty(),
         )
     }
+
+    private fun List<TransactionEntity>.spentPaise(): Long =
+        filter { it.type == TxnType.DEBIT && !it.excluded }.sumOf { it.amountPaise }
 
     private fun shares(
         transactions: List<TransactionEntity>,
@@ -122,8 +144,12 @@ class DashboardViewModel @Inject constructor(
             .mapNotNull { (categoryId, items) ->
                 val category = byId[categoryId] ?: return@mapNotNull null
                 val amount = items.sumOf { it.amountPaise }
-                CategoryShare(category, amount, amount.toFloat() / total)
+                CategoryShare(category, amount, amount.toFloat() / total, items.size)
             }
             .sortedByDescending { it.amountPaise }
+    }
+
+    private companion object {
+        const val TREND_MONTHS = 6
     }
 }

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,10 +22,16 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccountBalanceWallet
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.MarkEmailRead
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -36,13 +43,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.expensetracker.sms.SmsPermissions
+import com.expensetracker.ui.components.AppCard
+import com.expensetracker.ui.components.FilterPill
 import com.expensetracker.ui.components.HistoryRange
 import com.expensetracker.ui.components.label
+import com.expensetracker.ui.theme.appColors
 import java.time.YearMonth
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -62,20 +71,22 @@ fun OnboardingScreen(hasPermission: Boolean, onStart: (months: Int) -> Unit) {
             .fillMaxSize()
             .safeDrawingPadding()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 32.dp),
+            .padding(horizontal = 20.dp, vertical = 28.dp),
     ) {
         Box(
-            Modifier
-                .size(72.dp)
-                .clip(RoundedCornerShape(22.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer),
+            Modifier.size(76.dp).clip(RoundedCornerShape(24.dp)).background(appColors.hero),
             contentAlignment = Alignment.Center,
         ) {
-            Text("₹", fontSize = 36.sp, color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold)
+            Icon(
+                Icons.Rounded.AccountBalanceWallet,
+                contentDescription = null,
+                tint = appColors.onHero,
+                modifier = Modifier.size(38.dp),
+            )
         }
         Spacer(Modifier.height(24.dp))
-        Text("Your spending, sorted automatically", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(8.dp))
+        Text("Your spending, sorted automatically", style = MaterialTheme.typography.headlineLarge)
+        Spacer(Modifier.height(10.dp))
         Text(
             "Expense Tracker reads the alerts your bank sends by SMS and turns them into a monthly picture " +
                 "of where your money goes.",
@@ -84,18 +95,32 @@ fun OnboardingScreen(hasPermission: Boolean, onStart: (months: Int) -> Unit) {
         )
 
         Spacer(Modifier.height(24.dp))
-        Feature("📩", "Only bank alerts", "Debits and credits from SBI and other banks. OTPs, offers and personal chats are skipped.")
-        Feature("🔒", "Stays on your phone", "No account and no cloud. The app doesn't even have internet access.")
-        Feature("🗂️", "Sorted for you", "Food, shopping, bills and more. Unknown merchants go to Others, and it learns when you correct it.")
+        AppCard(contentPadding = PaddingValues(vertical = 8.dp)) {
+            Feature(
+                Icons.Rounded.MarkEmailRead,
+                "Only bank alerts",
+                "Debits and credits from SBI and other banks. OTPs, offers and personal chats are skipped.",
+            )
+            Feature(Icons.Rounded.Lock, "Stays on your phone", "No account and no cloud. The app doesn't even have internet access.")
+            Feature(
+                Icons.Rounded.AutoAwesome,
+                "Sorted for you",
+                "Food, shopping, bills and more. Unknown merchants go to Others, and it learns when you correct it.",
+            )
+        }
 
-        Spacer(Modifier.height(24.dp))
-        Text("Read past messages from", style = MaterialTheme.typography.titleSmall)
-        Spacer(Modifier.height(8.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Spacer(Modifier.height(28.dp))
+        Text("Read past messages from", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(10.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             HistoryRange.entries.forEach { option ->
-                FilterChip(selected = range == option, onClick = { range = option }, label = { Text(option.label) })
+                FilterPill(option.label, selected = range == option, onClick = { range = option })
             }
         }
+        Spacer(Modifier.height(8.dp))
         Text(
             "Whole months are read, so “Last month” includes all of ${YearMonth.now().minusMonths(1).label()}.",
             style = MaterialTheme.typography.bodySmall,
@@ -107,9 +132,10 @@ fun OnboardingScreen(hasPermission: Boolean, onStart: (months: Int) -> Unit) {
             onClick = {
                 if (hasPermission) onStart(range.months) else permissionLauncher.launch(SmsPermissions.required)
             },
-            modifier = Modifier.fillMaxWidth().height(52.dp),
+            shape = CircleShape,
+            modifier = Modifier.fillMaxWidth().height(56.dp),
         ) {
-            Text(if (hasPermission) "Read my messages" else "Allow SMS access")
+            Text(if (hasPermission) "Read my messages" else "Allow SMS access", style = MaterialTheme.typography.titleMedium)
         }
         if (denied && !hasPermission) {
             Spacer(Modifier.height(16.dp))
@@ -126,17 +152,23 @@ fun OnboardingScreen(hasPermission: Boolean, onStart: (months: Int) -> Unit) {
                         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)),
                     )
                 },
-                modifier = Modifier.fillMaxWidth(),
+                shape = CircleShape,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
             ) { Text("Open app settings") }
         }
     }
 }
 
 @Composable
-private fun Feature(icon: String, title: String, body: String) {
-    Row(Modifier.padding(vertical = 8.dp)) {
-        Text(icon, fontSize = 24.sp)
-        Spacer(Modifier.width(16.dp))
+private fun Feature(icon: ImageVector, title: String, body: String) {
+    Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.Top) {
+        Box(
+            Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(20.dp))
+        }
+        Spacer(Modifier.width(14.dp))
         Column {
             Text(title, style = MaterialTheme.typography.titleSmall)
             Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

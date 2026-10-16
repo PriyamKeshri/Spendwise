@@ -14,6 +14,8 @@ private val dayFormat = DateTimeFormatter.ofPattern("EEE, d MMM")
 private val timeFormat = DateTimeFormatter.ofPattern("h:mm a")
 private val dateTimeFormat = DateTimeFormatter.ofPattern("d MMM yyyy, h:mm a")
 private val dateFormat = DateTimeFormatter.ofPattern("d MMM yyyy")
+private val sameYearDateTimeFormat = DateTimeFormatter.ofPattern("d MMM, h:mm a")
+private val sameYearDateFormat = DateTimeFormatter.ofPattern("d MMM")
 
 fun YearMonth.label(): String = format(monthFormat)
 
@@ -29,6 +31,14 @@ fun LocalDate.dayLabel(today: LocalDate = LocalDate.now()): String = when (this)
 
 fun Long.timeLabel(): String = Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).format(timeFormat)
 
-fun Long.dateTimeLabel(): String = Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).format(dateTimeFormat)
+/** The year is left out for dates in the current year. */
+fun Long.dateTimeLabel(): String {
+    val time = Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault())
+    return time.format(if (time.year == LocalDate.now().year) sameYearDateTimeFormat else dateTimeFormat)
+}
 
-fun Long.dateLabel(): String = toLocalDate().format(dateFormat)
+/** The year is left out for dates in the current year. */
+fun Long.dateLabel(): String {
+    val date = toLocalDate()
+    return date.format(if (date.year == LocalDate.now().year) sameYearDateFormat else dateFormat)
+}

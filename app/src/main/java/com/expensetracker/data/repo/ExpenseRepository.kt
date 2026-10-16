@@ -31,8 +31,9 @@ class ExpenseRepository @Inject constructor(private val db: AppDatabase) {
     fun transactionsIn(month: YearMonth): Flow<List<TransactionEntity>> =
         transactionDao.observeBetween(month.startMillis(), month.endMillis())
 
-    fun spentIn(month: YearMonth): Flow<Long> =
-        transactionDao.observeSpentBetween(month.startMillis(), month.endMillis())
+    /** Everything from the start of [from] to the end of [through], newest first. */
+    fun transactionsBetween(from: YearMonth, through: YearMonth): Flow<List<TransactionEntity>> =
+        transactionDao.observeBetween(from.startMillis(), through.endMillis())
 
     fun transaction(id: Long): Flow<TransactionEntity?> = transactionDao.observeById(id)
 
