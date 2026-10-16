@@ -13,11 +13,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -44,7 +44,11 @@ import com.expensetracker.model.CategoryKind
 import com.expensetracker.model.TxnType
 import com.expensetracker.sms.Categorizer
 import com.expensetracker.sms.SmsParser
-import com.expensetracker.ui.components.CategoryAvatar
+import com.expensetracker.ui.components.CategoryGlyph
+import com.expensetracker.ui.components.CategoryTile
+import com.expensetracker.ui.components.CategoryVisuals
+import com.expensetracker.ui.components.FilterPill
+import com.expensetracker.ui.components.PillLabel
 import com.expensetracker.ui.components.SignedAmount
 import com.expensetracker.ui.components.dateTimeLabel
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -98,6 +102,7 @@ fun TransactionSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         val txn = transaction
         if (txn == null || txn.id != transactionId) {
@@ -135,7 +140,7 @@ private fun TransactionDetails(
             .padding(bottom = 32.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            CategoryAvatar(category, size = 52.dp)
+            CategoryTile(category, size = 56.dp)
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
                 Text(txn.merchant, style = MaterialTheme.typography.titleLarge, maxLines = 2)
@@ -146,17 +151,29 @@ private fun TransactionDetails(
                 )
             }
         }
-        Spacer(Modifier.height(16.dp))
-        SignedAmount(txn, style = MaterialTheme.typography.headlineMedium)
+        Spacer(Modifier.height(18.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SignedAmount(txn, style = MaterialTheme.typography.displaySmall)
+            if (txn.excluded) {
+                Spacer(Modifier.width(12.dp))
+                PillLabel(
+                    "Not counted",
+                    MaterialTheme.colorScheme.surfaceContainerHighest,
+                    MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
 
-        Spacer(Modifier.height(12.dp))
-        val via = listOfNotNull(txn.mode.label, txn.bank, txn.accountTail?.let { "••$it" }).joinToString(" · ")
-        DetailLine(if (txn.type == TxnType.DEBIT) "Paid via" else "Received via", via)
-        txn.vpa?.let { DetailLine("UPI ID", it) }
-        txn.refNo?.let { DetailLine("Reference", it) }
+        Spacer(Modifier.height(18.dp))
+        Panel {
+            val via = listOfNotNull(txn.mode.label, txn.bank, txn.accountTail?.let { "••$it" }).joinToString(" · ")
+            DetailLine(if (txn.type == TxnType.DEBIT) "Paid via" else "Received via", via)
+            txn.vpa?.let { DetailLine("UPI ID", it) }
+            txn.refNo?.let { DetailLine("Reference", it) }
+        }
 
-        HorizontalDivider(Modifier.padding(vertical = 16.dp))
-        Text("Category", style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.height(24.dp))
+        Text("Category", style = MaterialTheme.typography.titleMedium)
         if (ruleKey != null) {
             Row(
                 Modifier
@@ -166,51 +183,73 @@ private fun TransactionDetails(
             ) {
                 Checkbox(checked = rememberMerchant, onCheckedChange = { rememberMerchant = it })
                 Text(
-                    if (txn.type == TxnType.DEBIT) {
-                        "Use for all payments to $merchantLabel"
-                    } else {
-                        "Use for all money from $merchantLabel"
-                    },
+                    if (txn.type == TxnType.DEBIT) "Use for all payments to $merchantLabel" else "Use for all money from $merchantLabel",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
         } else {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
         }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             categories.filter { it.kind == kind }.forEach { option ->
-                FilterChip(
-                    selected = option.id == txn.categoryId,
+                val selected = option.id == txn.categoryId
+                FilterPill(
+                    label = option.name,
+                    selected = selected,
                     onClick = { onCategory(option.id, rememberMerchant && ruleKey != null) },
-                    label = { Text("${option.emoji} ${option.name}") },
-                )
-            }
-        }
-
-        HorizontalDivider(Modifier.padding(vertical = 16.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Count in totals", style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    if (txn.internalTransfer) {
-                        "Looks like a card bill payment or a transfer between your own accounts"
-                    } else {
-                        "Turn off for money that isn't really spending or income, like moving it to yourself"
+                    unselectedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    leading = {
+                        CategoryGlyph(option, tint = if (selected) LocalContentColor.current else CategoryVisuals.color(option))
                     },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Spacer(Modifier.width(12.dp))
-            Switch(checked = !txn.excluded, onCheckedChange = onCounted)
         }
 
-        HorizontalDivider(Modifier.padding(vertical = 16.dp))
-        Text("Original message from ${txn.sender}", style = MaterialTheme.typography.titleSmall)
-        Spacer(Modifier.height(8.dp))
-        Surface(color = MaterialTheme.colorScheme.surfaceContainerHighest, shape = MaterialTheme.shapes.medium) {
-            Text(txn.body, Modifier.padding(12.dp).fillMaxWidth(), style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(24.dp))
+        Panel {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Count in totals", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        if (txn.internalTransfer) {
+                            "Looks like a card bill payment or a transfer between your own accounts"
+                        } else {
+                            "Turn off for money that isn't really spending or income, like moving it to yourself"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Switch(checked = !txn.excluded, onCheckedChange = onCounted)
+            }
         }
+
+        Spacer(Modifier.height(24.dp))
+        Text("Original message", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "From ${txn.sender}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        Panel {
+            Text(txn.body, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+private fun Panel(content: @Composable () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp)) { content() }
     }
 }
 

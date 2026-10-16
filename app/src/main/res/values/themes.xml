@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#00695C</color>
-    <color name="window_background_light">#FFF8FAF9</color>
-    <color name="window_background_dark">#FF0F1413</color>
+    <color name="ic_launcher_background">#5B4BDB</color>
+    <color name="window_background_light">#FFF4F4FB</color>
+    <color name="window_background_dark">#FF0D0E1A</color>
 
     <style name="Theme.ExpenseTracker" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/window_background_light</item>

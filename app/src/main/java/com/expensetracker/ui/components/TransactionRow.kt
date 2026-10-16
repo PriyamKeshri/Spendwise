@@ -1,47 +1,30 @@
 package com.expensetracker.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.expensetracker.data.db.CategoryEntity
 import com.expensetracker.data.db.TransactionEntity
 import com.expensetracker.model.TxnType
 import com.expensetracker.ui.theme.incomeColor
+import com.expensetracker.ui.theme.money
 import com.expensetracker.util.Money
 
-@Composable
-fun CategoryAvatar(category: CategoryEntity?, modifier: Modifier = Modifier, size: Dp = 40.dp) {
-    val tint = category?.let { Color(it.color) } ?: MaterialTheme.colorScheme.outline
-    Box(
-        modifier = modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(tint.copy(alpha = 0.2f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(category?.emoji ?: "📦", fontSize = (size.value * 0.45f).sp)
-    }
-}
-
-/** "+₹500" in green for money in, "−₹250" for money out. */
+/** "+₹500" in green for money in, "−₹250" for money out, struck through when not counted. */
 @Composable
 fun SignedAmount(
     txn: TransactionEntity,
@@ -52,7 +35,8 @@ fun SignedAmount(
     Text(
         text = (if (credit) "+" else "−") + Money.format(txn.amountPaise),
         modifier = modifier,
-        style = style,
+        style = style.money(),
+        fontWeight = FontWeight.Bold,
         color = when {
             txn.excluded -> MaterialTheme.colorScheme.onSurfaceVariant
             credit -> incomeColor
@@ -68,31 +52,38 @@ fun TransactionRow(
     category: CategoryEntity?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    showTime: Boolean = true,
+    showDate: Boolean = false,
 ) {
-    val details = buildList {
-        add(category?.name ?: "Others")
-        add(txn.mode.label + (txn.accountTail?.let { " ••$it" } ?: ""))
-        add(if (showTime) txn.timestamp.timeLabel() else txn.timestamp.dateLabel())
-    }.joinToString(" · ")
+    val details = listOf(
+        category?.name ?: "Others",
+        if (showDate) txn.timestamp.dateLabel() else txn.timestamp.timeLabel(),
+    ).joinToString(" · ")
 
-    ListItem(
-        modifier = modifier.clickable(onClick = onClick),
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        leadingContent = { CategoryAvatar(category) },
-        headlineContent = { Text(txn.merchant, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        supportingContent = { Text(details, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        trailingContent = {
-            Column(horizontalAlignment = Alignment.End) {
-                SignedAmount(txn)
-                if (txn.excluded) {
-                    Text(
-                        "Not counted",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CategoryTile(category)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(txn.merchant, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                details,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            SignedAmount(txn)
+            if (txn.excluded) {
+                Text("Not counted", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-        },
-    )
+        }
+    }
 }

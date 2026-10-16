@@ -8,7 +8,6 @@ import com.expensetracker.data.prefs.SettingsStore
 import com.expensetracker.data.repo.ExpenseRepository
 import com.expensetracker.sms.SyncScheduler
 import com.expensetracker.sms.SyncStatus
-import com.expensetracker.ui.components.dateTimeLabel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +21,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.math.BigDecimal
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 @HiltViewModel
@@ -74,7 +76,7 @@ class SettingsViewModel @Inject constructor(
             writer.appendLine("Date,Type,Amount,Merchant,Category,Mode,Bank,Account,Reference,Counted")
             for (txn in transactions) {
                 val row = listOf(
-                    txn.timestamp.dateTimeLabel(),
+                    Instant.ofEpochMilli(txn.timestamp).atZone(ZoneId.systemDefault()).format(CSV_DATE),
                     if (txn.type.name == "DEBIT") "Debit" else "Credit",
                     BigDecimal.valueOf(txn.amountPaise, 2).toPlainString(),
                     txn.merchant,
@@ -93,4 +95,8 @@ class SettingsViewModel @Inject constructor(
 
     private fun csvField(value: String): String =
         if (value.any { it == ',' || it == '"' || it == '\n' }) "\"${value.replace("\"", "\"\"")}\"" else value
+
+    private companion object {
+        val CSV_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+    }
 }
