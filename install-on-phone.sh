@@ -13,4 +13,4 @@ fi
 
 ./gradlew --console=plain installDebug
 adb shell am start -n com.expensetracker/.MainActivity
-echo "Installed. Open Expense Tracker on your phone."
+echo "Installed. Open Spendwise on your phone."
