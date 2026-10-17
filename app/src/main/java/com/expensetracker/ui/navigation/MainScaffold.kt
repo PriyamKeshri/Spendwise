@@ -5,11 +5,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
-import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Insights
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -30,15 +30,19 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.expensetracker.ui.categories.CategoriesScreen
 import com.expensetracker.ui.dashboard.DashboardScreen
+import com.expensetracker.ui.insights.InsightsScreen
 import com.expensetracker.ui.settings.SettingsScreen
 import com.expensetracker.ui.transactions.TransactionsScreen
 
 private enum class Tab(val route: String, val label: String, val selectedIcon: ImageVector, val icon: ImageVector) {
     OVERVIEW("overview", "Overview", Icons.Rounded.Home, Icons.Outlined.Home),
     TRANSACTIONS("transactions", "Transactions", Icons.AutoMirrored.Rounded.ReceiptLong, Icons.AutoMirrored.Outlined.ReceiptLong),
-    CATEGORIES("categories", "Categories", Icons.Rounded.Category, Icons.Outlined.Category),
+    INSIGHTS("insights", "Insights", Icons.Rounded.Insights, Icons.Outlined.Insights),
     SETTINGS("settings", "Settings", Icons.Rounded.Settings, Icons.Outlined.Settings),
 }
+
+/** Opened from Settings rather than the tab bar: editing categories is occasional. */
+private const val CATEGORIES_ROUTE = "categories"
 
 @Composable
 fun MainScaffold() {
@@ -50,7 +54,7 @@ fun MainScaffold() {
         bottomBar = {
             NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 0.dp) {
                 Tab.entries.forEach { tab ->
-                    val selected = currentRoute == tab.route
+                    val selected = currentRoute == tab.route || (tab == Tab.SETTINGS && currentRoute == CATEGORIES_ROUTE)
                     NavigationBarItem(
                         selected = selected,
                         onClick = { navController.openTab(tab) },
@@ -68,11 +72,17 @@ fun MainScaffold() {
             modifier = Modifier.padding(padding),
         ) {
             composable(Tab.OVERVIEW.route) {
-                DashboardScreen(onOpenTransactions = { navController.openTab(Tab.TRANSACTIONS) })
+                DashboardScreen(
+                    onOpenTransactions = { navController.openTab(Tab.TRANSACTIONS) },
+                    onOpenInsights = { navController.openTab(Tab.INSIGHTS) },
+                )
             }
             composable(Tab.TRANSACTIONS.route) { TransactionsScreen() }
-            composable(Tab.CATEGORIES.route) { CategoriesScreen() }
-            composable(Tab.SETTINGS.route) { SettingsScreen() }
+            composable(Tab.INSIGHTS.route) { InsightsScreen() }
+            composable(Tab.SETTINGS.route) {
+                SettingsScreen(onOpenCategories = { navController.navigate(CATEGORIES_ROUTE) })
+            }
+            composable(CATEGORIES_ROUTE) { CategoriesScreen(onBack = { navController.popBackStack() }) }
         }
     }
 }

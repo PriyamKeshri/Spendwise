@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -36,6 +37,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -45,9 +47,12 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expensetracker.sms.SyncStatus
@@ -67,6 +72,7 @@ import com.expensetracker.ui.components.TrendBars
 import com.expensetracker.ui.components.dateLabel
 import com.expensetracker.ui.components.label
 import com.expensetracker.ui.components.monthName
+import com.expensetracker.ui.insights.TipCard
 import com.expensetracker.ui.theme.appColors
 import com.expensetracker.ui.theme.money
 import com.expensetracker.ui.transactions.TransactionSheet
@@ -77,7 +83,11 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @Composable
-fun DashboardScreen(onOpenTransactions: () -> Unit, viewModel: DashboardViewModel = hiltViewModel()) {
+fun DashboardScreen(
+    onOpenTransactions: () -> Unit,
+    onOpenInsights: () -> Unit,
+    viewModel: DashboardViewModel = hiltViewModel(),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var selectedId by rememberSaveable { mutableStateOf<Long?>(null) }
     val running = state.sync as? SyncStatus.Running
@@ -100,6 +110,17 @@ fun DashboardScreen(onOpenTransactions: () -> Unit, viewModel: DashboardViewMode
         item { SummaryCard(state, onMonthChange = viewModel::setMonth) }
         if (state.spentPaise > 0) {
             item { InsightsRow(state) }
+        }
+        state.topTip?.let { tip ->
+            item {
+                Row(Modifier.padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Ways to save", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    TextButton(onClick = onOpenInsights) {
+                        Text(if (state.tipCount > 1) "See all ${state.tipCount}" else "See insights")
+                    }
+                }
+            }
+            item { TipCard(tip, state.month) }
         }
         if (state.spending.isNotEmpty() || state.income.isNotEmpty()) {
             item {
@@ -317,12 +338,7 @@ private fun Insight(
             icon()
             Spacer(Modifier.height(10.dp))
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
-                value,
-                style = MaterialTheme.typography.titleSmall.money(),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            FitText(value, MaterialTheme.typography.titleSmall.money())
             Text(
                 detail,
                 style = MaterialTheme.typography.bodySmall,
@@ -333,6 +349,24 @@ private fun Insight(
         }
     }
 }
+
+/** One line that shrinks to fit, down to [MIN_FIT_SP], so a long name like "Food & Dining" isn't cut off. */
+@Composable
+private fun FitText(text: String, style: TextStyle) {
+    BoxWithConstraints {
+        val measurer = rememberTextMeasurer()
+        val available = constraints.maxWidth
+        val fitted = remember(text, style, available) {
+            var size = style.fontSize.value
+            fun fits() = measurer.measure(text, style.copy(fontSize = size.sp), softWrap = false, maxLines = 1).size.width <= available
+            while (size > MIN_FIT_SP && !fits()) size = maxOf(MIN_FIT_SP, size - 0.5f)
+            style.copy(fontSize = size.sp)
+        }
+        Text(text, style = fitted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+private const val MIN_FIT_SP = 11f
 
 @Composable
 private fun IconTile(icon: ImageVector, color: Color) {

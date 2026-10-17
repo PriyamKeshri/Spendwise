@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material.icons.rounded.Lock
@@ -61,7 +62,7 @@ import com.expensetracker.ui.components.dateLabel
 import java.time.LocalDate
 
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(onOpenCategories: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
     val historyStart by viewModel.historyStart.collectAsStateWithLifecycle()
     val count by viewModel.transactionCount.collectAsStateWithLifecycle()
     val sync by viewModel.sync.collectAsStateWithLifecycle()
@@ -104,6 +105,16 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                     "Check for new messages",
                     "New bank messages are picked up automatically as they arrive",
                     onClick = viewModel::checkNow,
+                )
+            }
+
+            SectionLabel("Sorting")
+            AppCard(contentPadding = PaddingValues(vertical = 6.dp)) {
+                SettingRow(
+                    Icons.Rounded.Category,
+                    "Categories and keywords",
+                    "Change how payments are sorted, and the merchants you've sorted yourself",
+                    onClick = onOpenCategories,
                 )
             }
 
