@@ -38,6 +38,11 @@ class CategorizerTest {
     }
 
     @Test
+    fun `UPI Lite top-ups are transfers`() {
+        assertEquals(CategoryIds.TRANSFERS, categorizer.categorize(debit("UPI Lite top-up")))
+    }
+
+    @Test
     fun `unknown merchants go to Others`() {
         assertEquals(CategoryIds.OTHERS, categorizer.categorize(debit("Sharma Traders")))
         assertEquals(CategoryIds.OTHERS, categorizer.categorize(debit("UPI payment")))

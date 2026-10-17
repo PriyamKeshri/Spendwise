@@ -61,6 +61,18 @@ class SmsParserTest {
     }
 
     @Test
+    fun `UPI Lite top-ups are labelled as such`() {
+        val p = parsed(
+            "VM-SBIUPI",
+            "Dear UPI user A/C X1234 debited by 500.0 on date 05Oct26 trf to UPI LITE Refno 627800000001. " +
+                "If not u? call 1800111109. -SBI",
+        )
+        assertEquals(TxnType.DEBIT, p.type)
+        assertEquals("UPI Lite top-up", p.merchant)
+        assertEquals(50_000L, p.amountPaise)
+    }
+
+    @Test
     fun `SBI UPI credit with no payer name`() {
         val p = parsed("VM-SBIUPI", "Dear SBI UPI User, ur A/cX1234 credited by Rs500 on 15Oct24 by  (Ref no 428912345678)")
         assertEquals(TxnType.CREDIT, p.type)

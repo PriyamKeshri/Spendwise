@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -52,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expensetracker.sms.SyncStatus
+import com.expensetracker.statement.ImportReport
 import com.expensetracker.ui.components.AppCard
 import com.expensetracker.ui.components.HistoryRange
 import com.expensetracker.ui.components.ScreenTitle
@@ -67,6 +69,10 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     var showScanDialog by rememberSaveable { mutableStateOf(false) }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
         uri?.let(viewModel::exportCsv)
+    }
+    val importState by viewModel.importState.collectAsStateWithLifecycle()
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::importStatement)
     }
 
     LaunchedEffect(Unit) { viewModel.messages.collect { snackbar.showSnackbar(it) } }
@@ -103,6 +109,17 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
 
             SectionLabel("Data")
             AppCard(contentPadding = PaddingValues(vertical = 6.dp)) {
+                SettingRow(
+                    Icons.Rounded.UploadFile,
+                    "Import Paytm statement",
+                    if (importState == SettingsViewModel.ImportState.Running) {
+                        "Importing…"
+                    } else {
+                        "Adds payments that never came by SMS, like UPI Lite. In Paytm: Balance & History → " +
+                            "Download UPI Statement → Excel."
+                    },
+                ) { importLauncher.launch(STATEMENT_TYPES) }
+                RowDivider()
                 SettingRow(Icons.Rounded.IosShare, "Export to CSV", "Save every transaction as a spreadsheet") {
                     exportLauncher.launch("expenses-${LocalDate.now()}.csv")
                 }
@@ -139,6 +156,63 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             },
         )
     }
+
+    when (val state = importState) {
+        is SettingsViewModel.ImportState.Done -> ImportResultDialog(
+            title = "Paytm statement imported",
+            message = importSummary(state.report),
+            onDismiss = viewModel::dismissImportResult,
+        )
+        is SettingsViewModel.ImportState.Failed -> ImportResultDialog(
+            title = "Couldn't import this file",
+            message = state.message + "\n\nIn Paytm, go to Balance & History → Download UPI Statement and choose Excel.",
+            onDismiss = viewModel::dismissImportResult,
+        )
+        else -> Unit
+    }
+}
+
+/** Spreadsheet types a file picker may report for a Paytm statement (some report .xlsx as a plain binary). */
+private val STATEMENT_TYPES = arrayOf(
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel",
+    "text/csv",
+    "text/comma-separated-values",
+    "application/octet-stream",
+)
+
+private fun importSummary(report: ImportReport): String = buildList {
+    add(
+        if (report.added == 0) {
+            "Nothing new: everything in this file is already in Spendwise."
+        } else {
+            "Added ${plural(report.added, "payment")}."
+        },
+    )
+    if (report.added > 0 && report.alreadyTracked > 0) {
+        add("${plural(report.alreadyTracked, "payment")} ${if (report.alreadyTracked == 1) "was" else "were"} already tracked.")
+    }
+    if (report.skippedNotCompleted > 0) {
+        add("Skipped ${plural(report.skippedNotCompleted, "failed or pending payment")}.")
+    }
+    if (report.skippedLiteTopUps > 0) {
+        add("Skipped ${plural(report.skippedLiteTopUps, "UPI Lite top-up")}, since the Lite payments themselves are counted.")
+    }
+    if (report.unreadableRows > 0) {
+        add("${plural(report.unreadableRows, "row")} couldn't be read.")
+    }
+}.joinToString("\n")
+
+private fun plural(count: Int, noun: String) = "$count $noun" + if (count == 1) "" else "s"
+
+@Composable
+private fun ImportResultDialog(title: String, message: String, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(message, style = MaterialTheme.typography.bodyMedium) },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } },
+    )
 }
 
 @Composable

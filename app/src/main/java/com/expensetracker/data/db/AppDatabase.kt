@@ -3,6 +3,7 @@ package com.expensetracker.data.db
 import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -11,8 +12,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [TransactionEntity::class, CategoryEntity::class, MerchantRuleEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = true,
+    autoMigrations = [AutoMigration(from = 1, to = 2)], // adds source + import_key for statement imports
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {

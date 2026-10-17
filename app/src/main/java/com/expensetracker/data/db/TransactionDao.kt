@@ -20,6 +20,24 @@ interface TransactionDao {
     )
     suspend fun existsByRef(refNo: String, amountPaise: Long, type: String): Boolean
 
+    /**
+     * Whether an SMS already recorded a payment of this amount and direction within the window. With
+     * [onlyWithoutRef], SMS rows that carry their own reference are ignored, since a different
+     * reference means a different payment.
+     */
+    @Query(
+        "SELECT EXISTS(SELECT 1 FROM transactions WHERE source = 'SMS' AND amount_paise = :amountPaise " +
+            "AND type = :type AND timestamp BETWEEN :from AND :to AND (:onlyWithoutRef = 0 OR ref_no IS NULL))",
+    )
+    suspend fun existsSmsNear(amountPaise: Long, type: String, from: Long, to: Long, onlyWithoutRef: Boolean): Boolean
+
+    /** Once the individual UPI Lite payments are imported, the bank's Lite top-up debits would count them twice. */
+    @Query(
+        "UPDATE transactions SET excluded = 1, internal_transfer = 1 WHERE exclude_locked = 0 AND type = 'DEBIT' " +
+            "AND source = 'SMS' AND body LIKE '%upi lite%' AND timestamp BETWEEN :from AND :to",
+    )
+    suspend fun excludeUpiLiteTopUps(from: Long, to: Long): Int
+
     @Query("SELECT * FROM transactions WHERE timestamp >= :start AND timestamp < :end ORDER BY timestamp DESC")
     fun observeBetween(start: Long, end: Long): Flow<List<TransactionEntity>>
 

@@ -53,11 +53,13 @@ object SmsParser {
             TxnType.CREDIT -> CARD_BILL_CREDIT.containsMatchIn(lower)
         }
         val accountToAccount = type == TxnType.DEBIT && ACCOUNT_TO_ACCOUNT.containsMatchIn(lower)
+        // Money loaded into UPI Lite: the small payments made from it never get their own bank SMS.
+        val liteTopUp = type == TxnType.DEBIT && UPI_LITE.containsMatchIn(lower)
 
         return ParsedSms(
             type = type,
             amountPaise = amountPaise,
-            merchant = party.name ?: genericLabel(type, mode),
+            merchant = if (liteTopUp) UPI_LITE_TOP_UP else party.name ?: genericLabel(type, mode),
             vpa = party.vpa ?: vpaInText,
             mode = mode,
             bank = bank,
@@ -248,7 +250,7 @@ object SmsParser {
     }
 
     /** "AMAZON PAY INDIA" reads better as "Amazon Pay India"; other short words stay as acronyms (SBI, KFC). */
-    private fun prettify(name: String): String =
+    internal fun prettify(name: String): String =
         if (name.any { it.isLowerCase() }) {
             name
         } else {
@@ -368,6 +370,8 @@ object SmsParser {
         """\b(?:payment|pymt)\b.{0,80}\bcredit\s*card\b|\bcredit\s*card\b.{0,80}\b(?:payment|pymt)\s*(?:of|received|credited)\b""",
     )
     private val ACCOUNT_TO_ACCOUNT = Regex("""\ba/c\s*(?:no\.?\s*)?[x*]+[0-9]{3,6}\s+credited\b""")
+    private val UPI_LITE = Regex("""\bupi\s?lite\b""")
+    private const val UPI_LITE_TOP_UP = "UPI Lite top-up"
 
     /** Boilerplate after which no merchant name appears ("Not you? Call ...", "Avl Bal ..."). */
     private val DISCLAIMER = Regex(
