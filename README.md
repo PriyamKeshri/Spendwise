@@ -28,6 +28,7 @@ Spendwise does the bookkeeping for you, privately, on your phone.
 - **Learns from you**: re-file a merchant once and its future payments follow.
 - **Money in, too**: salary, refunds, interest and transfers from people.
 - **No double counting**: credit card bill payments (CRED included) and transfers between your own accounts stay out of totals.
+- **Paytm statements**: import Paytm's Excel UPI statement (Settings → Import Paytm statement) to add payments that never came by SMS, like UPI Lite. Payments already tracked are skipped.
 - **Private**: messages are read and stored only on the phone. The app has no internet permission.
 
 ## Install
@@ -54,6 +55,7 @@ Then open Spendwise, choose how far back to read, and allow SMS access. If Andro
 | **Kotlin** | All app code | Google's recommended Android language. Null safety and coroutines keep parsing and I/O code short and safe. |
 | **Jetpack Compose + Material 3** | Every screen | Declarative UI with far less code than XML views, plus ready-made accessible components and light/dark theming. |
 | **Compose Canvas** | Donut, trend and daily charts | The charts are simple shapes, so drawing them directly avoids a charting library and keeps the app small. |
+| **Built-in zip + XML parsing** | Reading Paytm's Excel statements | An .xlsx file is zipped XML, so reading it directly avoids a multi-megabyte spreadsheet library and works offline. |
 | **Coroutines + Flow** | Background work, live updates | The database emits Flows, so every screen refreshes on its own when a new SMS is imported. |
 | **Room** (SQLite) | Transactions, categories, learned merchants | Compile-time-checked SQL, Flow support, and a unique index that makes re-reading the inbox safe. |
 | **DataStore** | Sync position and settings | Asynchronous, type-safe replacement for SharedPreferences. |
@@ -70,10 +72,14 @@ Then open Spendwise, choose how far back to read, and allow SMS access. If Andro
 flowchart LR
     inbox[SMS inbox] --> parser[SmsParser]
     receiver[New SMS] --> worker[WorkManager] --> parser
-    parser --> categorizer[Categorizer] --> db[(Room)] --> ui[Compose UI]
+    statement[Paytm statement] --> reader[StatementParser]
+    parser --> categorizer[Categorizer]
+    reader --> categorizer
+    categorizer --> db[(Room)] --> ui[Compose UI]
 ```
 
 - **SmsParser** pulls out the amount, debit or credit, merchant, account and UPI reference. It skips OTPs, offers, reminders and failed payments.
+- **StatementParser** reads Paytm's Excel statement on the phone, finding columns by their headings. Rows already found in SMS are matched by UPI reference and skipped.
 - **Categorizer** checks merchants you've sorted first, then category keywords (the longest match wins), then falls back to Others.
 
 ## Development

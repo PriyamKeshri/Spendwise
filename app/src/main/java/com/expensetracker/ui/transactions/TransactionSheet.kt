@@ -41,6 +41,7 @@ import com.expensetracker.data.db.CategoryEntity
 import com.expensetracker.data.db.TransactionEntity
 import com.expensetracker.data.repo.ExpenseRepository
 import com.expensetracker.model.CategoryKind
+import com.expensetracker.model.TxnSource
 import com.expensetracker.model.TxnType
 import com.expensetracker.sms.Categorizer
 import com.expensetracker.sms.SmsParser
@@ -229,9 +230,10 @@ private fun TransactionDetails(
         }
 
         Spacer(Modifier.height(24.dp))
-        Text("Original message", style = MaterialTheme.typography.titleMedium)
+        val imported = txn.source == TxnSource.PAYTM
+        Text(if (imported) "Statement entry" else "Original message", style = MaterialTheme.typography.titleMedium)
         Text(
-            "From ${txn.sender}",
+            if (imported) "Imported from your Paytm statement" else "From ${txn.sender}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

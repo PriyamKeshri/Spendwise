@@ -50,6 +50,31 @@ class ExpenseRepository @Inject constructor(private val db: AppDatabase) {
         added
     }
 
+    /**
+     * Adds rows from an imported statement, skipping payments Spendwise already has: the same UPI
+     * reference, or (when either side lacks one) an SMS for the same amount within a few minutes.
+     * Returns how many rows were new.
+     */
+    suspend fun insertImported(transactions: List<TransactionEntity>): Int = db.withTransaction {
+        var added = 0
+        for (txn in transactions) {
+            val type = txn.type.name
+            val from = txn.timestamp - SAME_PAYMENT_WINDOW_MS
+            val to = txn.timestamp + SAME_PAYMENT_WINDOW_MS
+            val ref = txn.refNo
+            val known = if (ref != null) {
+                transactionDao.existsByRef(ref, txn.amountPaise, type) ||
+                    transactionDao.existsSmsNear(txn.amountPaise, type, from, to, onlyWithoutRef = true)
+            } else {
+                transactionDao.existsSmsNear(txn.amountPaise, type, from, to, onlyWithoutRef = false)
+            }
+            if (!known && transactionDao.insert(txn) != -1L) added++
+        }
+        added
+    }
+
+    suspend fun excludeUpiLiteTopUps(from: Long, to: Long) = transactionDao.excludeUpiLiteTopUps(from, to)
+
     /** Pairs up debits and credits between the user's own accounts so they don't count as spending. */
     suspend fun reconcileTransfers() = db.withTransaction {
         transactionDao.markSelfTransfers()
@@ -109,4 +134,9 @@ class ExpenseRepository @Inject constructor(private val db: AppDatabase) {
     suspend fun allTransactions(): List<TransactionEntity> = transactionDao.all()
 
     suspend fun allCategories(): List<CategoryEntity> = categoryDao.all()
+
+    private companion object {
+        /** A bank SMS and a statement row this close together, for the same amount, are one payment. */
+        const val SAME_PAYMENT_WINDOW_MS = 10 * 60 * 1000L
+    }
 }

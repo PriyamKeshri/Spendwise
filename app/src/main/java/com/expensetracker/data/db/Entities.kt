@@ -6,6 +6,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.expensetracker.model.CategoryKind
 import com.expensetracker.model.PaymentMode
+import com.expensetracker.model.TxnSource
 import com.expensetracker.model.TxnType
 
 @Entity(
@@ -15,6 +16,7 @@ import com.expensetracker.model.TxnType
         Index(value = ["timestamp"]),
         Index(value = ["ref_no"]),
         Index(value = ["category_id"]),
+        Index(value = ["import_key"], unique = true),
     ],
 )
 data class TransactionEntity(
@@ -41,6 +43,9 @@ data class TransactionEntity(
     @ColumnInfo(name = "internal_transfer") val internalTransfer: Boolean = false,
     val sender: String,
     val body: String,
+    @ColumnInfo(name = "source", defaultValue = "SMS") val source: TxnSource = TxnSource.SMS,
+    /** Identifies a row from an imported statement, so importing the same file again adds nothing. */
+    @ColumnInfo(name = "import_key") val importKey: String? = null,
 )
 
 @Entity(tableName = "categories")
