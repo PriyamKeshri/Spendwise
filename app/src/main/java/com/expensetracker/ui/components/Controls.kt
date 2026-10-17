@@ -19,6 +19,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.Icon
@@ -56,11 +57,21 @@ fun AppCard(
 }
 
 @Composable
-fun ScreenTitle(text: String, modifier: Modifier = Modifier, action: @Composable () -> Unit = {}) {
+fun ScreenTitle(
+    text: String,
+    modifier: Modifier = Modifier,
+    onBack: (() -> Unit)? = null,
+    action: @Composable () -> Unit = {},
+) {
     Row(
         modifier = modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (onBack != null) {
+            IconButton(onClick = onBack, modifier = Modifier.padding(end = 4.dp)) {
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+            }
+        }
         Text(text, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
         action()
     }

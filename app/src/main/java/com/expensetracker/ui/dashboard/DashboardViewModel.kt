@@ -11,6 +11,8 @@ import com.expensetracker.model.TxnType
 import com.expensetracker.sms.SyncScheduler
 import com.expensetracker.sms.SyncStatus
 import com.expensetracker.ui.SharedFilters
+import com.expensetracker.insights.SavingTip
+import com.expensetracker.insights.SpendingAnalyzer
 import com.expensetracker.ui.components.TrendPoint
 import com.expensetracker.util.toLocalDate
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -41,6 +43,9 @@ data class DashboardUiState(
     val daily: List<Long> = emptyList(),
     val dailyAveragePaise: Long = 0,
     val biggestExpense: TransactionEntity? = null,
+    /** The month's most valuable saving tip, as a teaser for the Insights tab. */
+    val topTip: SavingTip? = null,
+    val tipCount: Int = 0,
     val recent: List<TransactionEntity> = emptyList(),
     val categories: Map<Long, CategoryEntity> = emptyMap(),
     val hasTransactions: Boolean = false,
@@ -109,6 +114,7 @@ class DashboardViewModel @Inject constructor(
             if (day in daily.indices) daily[day] += txn.amountPaise
         }
         val daysSoFar = if (month == YearMonth.now()) LocalDate.now().dayOfMonth else month.lengthOfMonth()
+        val tips = SpendingAnalyzer.analyze(window, byId, month, zone = zone).tips
 
         return DashboardUiState(
             month = month,
@@ -123,6 +129,8 @@ class DashboardViewModel @Inject constructor(
             daily = daily.toList(),
             dailyAveragePaise = spent / daysSoFar.coerceAtLeast(1),
             biggestExpense = debits.maxByOrNull { it.amountPaise },
+            topTip = tips.firstOrNull(),
+            tipCount = tips.size,
             recent = transactions.take(5),
             categories = byId,
             hasTransactions = transactions.isNotEmpty(),

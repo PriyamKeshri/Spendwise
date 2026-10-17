@@ -15,7 +15,7 @@ Spendwise does the bookkeeping for you, privately, on your phone.
 [![Latest release](https://img.shields.io/github/v/release/PriyamKeshri/Spendwise?label=download&color=5B4BDB)](https://github.com/PriyamKeshri/Spendwise/releases/latest)
 
 <img src="docs/screenshots/overview-dark.png" width="24%" alt="Overview with the month's total and a six-month trend">
-<img src="docs/screenshots/breakdown-dark.png" width="24%" alt="Spending split by category">
+<img src="docs/screenshots/insights-dark.png" width="24%" alt="Insights with saving tips">
 <img src="docs/screenshots/transactions-light.png" width="24%" alt="Transactions grouped by day">
 <img src="docs/screenshots/details-light.png" width="24%" alt="Transaction details with the category picker">
 
@@ -29,6 +29,7 @@ Spendwise does the bookkeeping for you, privately, on your phone.
 - **Money in, too**: salary, refunds, interest and transfers from people.
 - **No double counting**: credit card bill payments (CRED included) and transfers between your own accounts stay out of totals.
 - **Paytm statements**: import Paytm's Excel UPI statement (Settings → Import Paytm statement) to add payments that never came by SMS, like UPI Lite. Payments already tracked are skipped.
+- **Insights and saving tips**: see how a month compares with your usual, where it's heading, and which payments repeat. Spendwise then points out where to save, such as food delivery, subscriptions or categories running above usual, with a monthly estimate for each.
 - **Private**: messages are read and stored only on the phone. The app has no internet permission.
 
 ## Install
@@ -39,7 +40,7 @@ Spendwise does the bookkeeping for you, privately, on your phone.
 
 1. On the phone, open Settings → About phone and tap **Build number** 7 times, then turn on **USB debugging** in Developer options. On Xiaomi, Redmi or POCO, also turn on **Install via USB**.
 2. Connect it to your computer and tap **Allow** on the prompt.
-3. Run `./install-on-phone.sh` from this repo, or `adb install Spendwise-v1.0.apk` with the APK from the [latest release](https://github.com/PriyamKeshri/Spendwise/releases/latest).
+3. Run `./install-on-phone.sh` from this repo, or run `adb install` on the APK from the [latest release](https://github.com/PriyamKeshri/Spendwise/releases/latest).
 
 **From the download**
 
@@ -56,6 +57,7 @@ Then open Spendwise, choose how far back to read, and allow SMS access. If Andro
 | **Jetpack Compose + Material 3** | Every screen | Declarative UI with far less code than XML views, plus ready-made accessible components and light/dark theming. |
 | **Compose Canvas** | Donut, trend and daily charts | The charts are simple shapes, so drawing them directly avoids a charting library and keeps the app small. |
 | **Built-in zip + XML parsing** | Reading Paytm's Excel statements | An .xlsx file is zipped XML, so reading it directly avoids a multi-megabyte spreadsheet library and works offline. |
+| **Rule-based analysis** (plain Kotlin) | Insights and saving tips | Simple rules over your own history run instantly offline, need no AI service, and every tip shows the numbers behind it. |
 | **Coroutines + Flow** | Background work, live updates | The database emits Flows, so every screen refreshes on its own when a new SMS is imported. |
 | **Room** (SQLite) | Transactions, categories, learned merchants | Compile-time-checked SQL, Flow support, and a unique index that makes re-reading the inbox safe. |
 | **DataStore** | Sync position and settings | Asynchronous, type-safe replacement for SharedPreferences. |
@@ -64,7 +66,7 @@ Then open Spendwise, choose how far back to read, and allow SMS access. If Andro
 | **Hilt** | Dependency injection | Wires the database, repository and background workers together with very little boilerplate. |
 | **Navigation Compose** | Bottom-bar tabs | Keeps each tab's scroll and filter state when you switch between them. |
 | **Plus Jakarta Sans** | Typography | A clean geometric typeface with tabular figures, so amounts line up neatly. |
-| **JUnit** | Parser and categorizer tests | Bank message formats are the riskiest part, so they're tested against SBI, HDFC, ICICI, Axis and Kotak message formats. |
+| **JUnit** | Parser, statement and insight tests | Bank message formats are the riskiest part, so they're tested against SBI, HDFC, ICICI, Axis and Kotak message formats. |
 
 ## How it works
 
@@ -76,16 +78,18 @@ flowchart LR
     parser --> categorizer[Categorizer]
     reader --> categorizer
     categorizer --> db[(Room)] --> ui[Compose UI]
+    db --> analyzer[SpendingAnalyzer] --> ui
 ```
 
 - **SmsParser** pulls out the amount, debit or credit, merchant, account and UPI reference. It skips OTPs, offers, reminders and failed payments.
 - **StatementParser** reads Paytm's Excel statement on the phone, finding columns by their headings. Rows already found in SMS are matched by UPI reference and skipped.
 - **Categorizer** checks merchants you've sorted first, then category keywords (the longest match wins), then falls back to Others.
+- **SpendingAnalyzer** compares the month with up to three earlier months, projects a month still in progress, finds repeat payments, and turns patterns into saving tips.
 
 ## Development
 
 ```bash
-./gradlew testDebugUnitTest   # parser and categorizer tests
+./gradlew testDebugUnitTest   # unit tests
 ./gradlew assembleDebug       # APK in app/build/outputs/apk/debug/
 ./gradlew assembleRelease     # smaller, optimised APK in app/build/outputs/apk/release/
 ```

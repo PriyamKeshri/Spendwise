@@ -51,7 +51,7 @@ import com.expensetracker.ui.components.PillToggle
 import com.expensetracker.ui.components.ScreenTitle
 
 @Composable
-fun CategoriesScreen(viewModel: CategoriesViewModel = hiltViewModel()) {
+fun CategoriesScreen(onBack: () -> Unit, viewModel: CategoriesViewModel = hiltViewModel()) {
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val rules by viewModel.rules.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<CategoryEntity?>(null) }
@@ -63,7 +63,7 @@ fun CategoriesScreen(viewModel: CategoriesViewModel = hiltViewModel()) {
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 104.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            item { ScreenTitle("Categories", Modifier.padding(start = 4.dp)) }
+            item { ScreenTitle("Categories", onBack = onBack) }
             item { SectionHeader("Spending", "Matched against the merchant name. Anything unmatched goes to Others.") }
             item {
                 CategoryGroup(categories.filter { it.kind == CategoryKind.EXPENSE }) { editing = it }
