@@ -88,7 +88,11 @@ fun InsightsScreen(viewModel: InsightsViewModel = hiltViewModel()) {
                     item {
                         SectionHeader(
                             "Compared with your usual",
-                            if (insights.usualSpendPaise == null) "No earlier months to compare with yet" else "Your average of recent months",
+                            when {
+                                insights.usualSpendPaise == null -> "No earlier months to compare with yet"
+                                insights.inProgress -> "Where each category is heading this month"
+                                else -> "Your average of recent months"
+                            },
                         )
                     }
                     item { TrendsCard(insights) }
@@ -219,13 +223,13 @@ private fun TrendRow(trend: CategoryTrend) {
         Column(Modifier.weight(1f)) {
             Text(trend.category.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                trend.usualPaise?.let { "Usually ${Money.format(it, false)}" } ?: "New this month",
+                trendDetail(trend),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         Column(horizontalAlignment = Alignment.End) {
-            Text(Money.format(trend.amountPaise, false), style = MaterialTheme.typography.titleSmall.money())
+            Text(Money.format(trend.comparedPaise, false), style = MaterialTheme.typography.titleSmall.money())
             trend.change?.takeIf { abs(it) >= 0.05f }?.let { change ->
                 Spacer(Modifier.height(4.dp))
                 val up = change > 0
@@ -238,6 +242,16 @@ private fun TrendRow(trend: CategoryTrend) {
                 )
             }
         }
+    }
+}
+
+/** In a month in progress the row's amount is where it's heading, so this line says what's been spent so far. */
+private fun trendDetail(trend: CategoryTrend): String {
+    val usual = trend.usualPaise?.takeIf { it > 0 } ?: return "New this month"
+    return if (trend.projectedPaise != null) {
+        "${Money.format(trend.amountPaise, false)} so far · usually ${Money.format(usual, false)}"
+    } else {
+        "Usually ${Money.format(usual, false)}"
     }
 }
 
