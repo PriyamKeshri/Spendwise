@@ -60,12 +60,19 @@ sealed interface SavingTip {
 
 data class CategoryTrend(
     val category: CategoryEntity,
+    /** Spent in the month, or so far in a month in progress. */
     val amountPaise: Long,
     /** Average for this category over recent months that have data; null without history. */
     val usualPaise: Long?,
-    /** Change of the month (or its projection, while in progress) against [usualPaise]; null when not comparable yet. */
-    val change: Float?,
-)
+    /** Where a month in progress is heading: spending so far plus the usual rate for the days left. */
+    val projectedPaise: Long?,
+) {
+    /** What's compared with [usualPaise]: the projection while the month is in progress. */
+    val comparedPaise: Long get() = projectedPaise ?: amountPaise
+
+    /** Change of [comparedPaise] against [usualPaise]; null when there's no usual to compare with. */
+    val change: Float? get() = usualPaise?.takeIf { it > 0 }?.let { (comparedPaise - it).toFloat() / it }
+}
 
 data class RecurringPayment(val name: String, val category: CategoryEntity?, val monthlyPaise: Long, val months: Int, val lastPaid: Long)
 
@@ -146,14 +153,13 @@ object SpendingAnalyzer {
             val category = categories[categoryId] ?: return@mapNotNull null
             val amount = items.sumOf { it.amountPaise }
             val usual = usual { it.categoryId == categoryId }
-            val now = comparable(amount, usual)
             CategoryTrend(
                 category = category,
                 amountPaise = amount,
                 usualPaise = usual,
-                change = if (usual != null && usual > 0 && now != null) (now - usual).toFloat() / usual else null,
+                projectedPaise = if (inProgress && usual != null && usual > 0) comparable(amount, usual) else null,
             )
-        }.sortedByDescending { it.amountPaise }
+        }.sortedByDescending { it.comparedPaise }
 
         val patterns = patterns(debits, spent, zone)
         val usualSpend = usual { true }
@@ -165,7 +171,7 @@ object SpendingAnalyzer {
             if (history.size >= MIN_BASELINE_MONTHS_FOR_TIPS) {
                 // Food delivery already covers the food category, so it isn't flagged twice.
                 val skip = if (foodTip != null) setOf(CategoryIds.FOOD) else emptySet()
-                addAll(categoriesAboveUsual(trends.filter { it.category.id !in skip }, ::comparable, inProgress))
+                addAll(categoriesAboveUsual(trends.filter { it.category.id !in skip }, inProgress))
             }
             subscriptions(counted, month, zone)?.let(::add)
             if (patterns.smallCount >= SMALL_MIN_COUNT && patterns.smallTotalPaise >= SMALL_MIN_TOTAL) {
@@ -208,15 +214,11 @@ object SpendingAnalyzer {
         return if (orders.size >= DELIVERY_MIN_ORDERS && total >= DELIVERY_MIN_TOTAL) SavingTip.FoodDelivery(orders.size, total) else null
     }
 
-    private fun categoriesAboveUsual(
-        trends: List<CategoryTrend>,
-        comparable: (Long, Long?) -> Long?,
-        inProgress: Boolean,
-    ): List<SavingTip.CategoryAboveUsual> = trends
+    private fun categoriesAboveUsual(trends: List<CategoryTrend>, inProgress: Boolean): List<SavingTip.CategoryAboveUsual> = trends
         .filter { it.category.kind == CategoryKind.EXPENSE && it.category.id !in NOT_DISCRETIONARY }
         .mapNotNull { trend ->
             val usual = trend.usualPaise ?: return@mapNotNull null
-            val now = comparable(trend.amountPaise, usual) ?: return@mapNotNull null
+            val now = trend.comparedPaise
             if (usual < SPIKE_MIN_USUAL || now < usual * SPIKE_RATIO || now - usual < SPIKE_MIN_EXTRA) return@mapNotNull null
             SavingTip.CategoryAboveUsual(trend.category, now, usual, onPace = inProgress)
         }
@@ -228,7 +230,8 @@ object SpendingAnalyzer {
         val months = setOf(month, month.minusMonths(1))
         val latest = counted
             .filter {
-                it.type == TxnType.DEBIT && it.categoryId == CategoryIds.SUBSCRIPTIONS &&
+                // A rupee or two is an autopay being set up or verified, not what the subscription costs.
+                it.type == TxnType.DEBIT && it.categoryId == CategoryIds.SUBSCRIPTIONS && it.amountPaise >= SUBSCRIPTION_MIN &&
                     YearMonth.from(it.timestamp.toLocalDate(zone)) in months
             }
             .groupBy { recurringKey(it) ?: it.merchant }
@@ -303,6 +306,7 @@ object SpendingAnalyzer {
     private const val SMALL_MIN_TOTAL = 1_200 * RUPEE
     private const val DELIVERY_MIN_ORDERS = 4
     private const val DELIVERY_MIN_TOTAL = 1_000 * RUPEE
+    private const val SUBSCRIPTION_MIN = 10 * RUPEE
     private const val SPIKE_MIN_USUAL = 300 * RUPEE
     private const val SPIKE_MIN_EXTRA = 500 * RUPEE
     private const val SPIKE_RATIO = 1.3
@@ -313,8 +317,13 @@ object SpendingAnalyzer {
     private const val RECURRING_TOLERANCE = 0.15
     private const val RECURRING_STEADY_SHARE = 0.8
 
-    /** Rent, transfers and cash aren't spending habits a tip can trim. */
-    private val NOT_DISCRETIONARY = setOf(CategoryIds.RENT, CategoryIds.TRANSFERS, CategoryIds.CASH, CategoryIds.OTHERS)
+    /**
+     * Spending a tip shouldn't ask you to cut: essentials like rent, health and education (often one-off
+     * bills), and money that was moved rather than spent.
+     */
+    private val NOT_DISCRETIONARY = setOf(
+        CategoryIds.RENT, CategoryIds.HEALTH, CategoryIds.EDUCATION, CategoryIds.TRANSFERS, CategoryIds.CASH, CategoryIds.OTHERS,
+    )
     private val DELIVERY_APPS = listOf(
         "swiggy", "zomato", "eatsure", "dominos", "faasos", "box8", "behrouz", "ovenstory", "pizza hut", "mcdonalds",
         "kfc", "burger king", "wow momo",

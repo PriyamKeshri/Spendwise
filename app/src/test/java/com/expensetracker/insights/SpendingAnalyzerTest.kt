@@ -174,4 +174,59 @@ class SpendingAnalyzerTest {
         assertNull(insights.usualSpendPaise)
         assertTrue(insights.categoryTrends.all { it.change == null })
     }
+
+    @Test
+    fun `doesn't suggest cutting health or education spending`() {
+        val usual = listOf("2026-08-12", "2026-09-15").flatMap { day ->
+            listOf(txn(day, 1_000, "Apollo Pharmacy", CategoryIds.HEALTH), txn(day, 2_000, "Coursera", CategoryIds.EDUCATION))
+        }
+        val october = listOf(
+            txn("2026-10-16", 6_595, "Pet Hospital", CategoryIds.HEALTH),
+            txn("2026-10-12", 9_000, "Exam Fees", CategoryIds.EDUCATION),
+        )
+
+        val insights = SpendingAnalyzer.analyze(usual + october, categories, this.october, LocalDate.of(2026, 11, 15), zone)
+
+        assertTrue(insights.tips.none { it is SavingTip.CategoryAboveUsual })
+        // Still shown against the usual, just not as something to cut.
+        assertEquals(5.595f, insights.categoryTrends.single { it.category.id == CategoryIds.HEALTH }.change!!, 0.001f)
+    }
+
+    @Test
+    fun `leaves autopay setup charges out of subscriptions`() {
+        val month = listOf(
+            txn("2026-10-07", 649, "Netflix", CategoryIds.SUBSCRIPTIONS),
+            txn("2026-10-09", 2, "LinkedIn", CategoryIds.SUBSCRIPTIONS),
+        )
+
+        val tip = SpendingAnalyzer.analyze(month, categories, october, LocalDate.of(2026, 11, 15), zone)
+            .tips.filterIsInstance<SavingTip.Subscriptions>().single()
+
+        assertEquals(listOf("Netflix"), tip.names)
+    }
+
+    @Test
+    fun `compares a month in progress by where it's heading`() {
+        val history = listOf(
+            txn("2026-08-12", 3_000, "Myntra", CategoryIds.SHOPPING),
+            txn("2026-09-15", 3_000, "Myntra", CategoryIds.SHOPPING),
+        )
+        val soFar = listOf(txn("2026-10-02", 100, "Myntra", CategoryIds.SHOPPING))
+
+        val shopping = SpendingAnalyzer.analyze(history + soFar, categories, october, LocalDate.of(2026, 10, 18), zone)
+            .categoryTrends.single()
+
+        assertEquals(10_000L, shopping.amountPaise)
+        // ₹100 so far plus the usual ₹3,000 for the 13 of 31 days left, and the change is measured from that.
+        val heading = 10_000L + 300_000L * 13 / 31
+        assertEquals(heading, shopping.projectedPaise)
+        assertEquals(heading, shopping.comparedPaise)
+        assertEquals((heading - 300_000L).toFloat() / 300_000L, shopping.change!!, 0.0001f)
+
+        // A finished month is compared as it is.
+        val september = SpendingAnalyzer.analyze(history, categories, YearMonth.of(2026, 9), LocalDate.of(2026, 10, 18), zone)
+            .categoryTrends.single()
+        assertNull(september.projectedPaise)
+        assertEquals(300_000L, september.comparedPaise)
+    }
 }
