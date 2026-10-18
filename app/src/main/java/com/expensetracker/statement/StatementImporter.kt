@@ -3,6 +3,7 @@ package com.expensetracker.statement
 import android.content.Context
 import android.net.Uri
 import com.expensetracker.data.db.CategoryEntity
+import com.expensetracker.data.db.CategoryIds
 import com.expensetracker.data.db.TransactionEntity
 import com.expensetracker.data.repo.ExpenseRepository
 import com.expensetracker.model.CategoryKind
@@ -65,12 +66,7 @@ class StatementImporter @Inject constructor(
 
     private fun StatementEntry.toEntity(categorizer: Categorizer, categories: List<CategoryEntity>): TransactionEntity {
         val merchant = counterparty ?: SmsParser.genericLabel(type, PaymentMode.UPI)
-        val kind = if (type == TxnType.DEBIT) CategoryKind.EXPENSE else CategoryKind.INCOME
-        // A tag the user set in Paytm is an explicit choice, so it's kept like a manual category.
-        val tagged = tags.firstNotNullOfOrNull { categoryForTag(it, categories, kind) }
-        val categoryId = tagged ?: categorizer.categorize(
-            CategorizerInput(type, PaymentMode.UPI, merchant, vpa, summary, personTransfer, internalTransfer = false),
-        )
+        val (categoryId, tagged) = categorize(this, merchant, categories, categorizer)
         return TransactionEntity(
             smsId = null,
             type = type,
@@ -83,30 +79,92 @@ class StatementImporter @Inject constructor(
             refNo = refNo,
             timestamp = timestamp,
             categoryId = categoryId,
-            userCategorized = tagged != null,
+            userCategorized = tagged,
             personTransfer = personTransfer,
             sender = SOURCE_LABEL,
             body = summary,
             source = TxnSource.PAYTM,
-            importKey = importKey(),
+            importKey = importKey(this),
         )
     }
 
-    private fun StatementEntry.importKey(): String =
-        "paytm:" + (refNo ?: "$timestamp:$amountPaise:$type:${Categorizer.normalize(counterparty ?: vpa.orEmpty())}")
-
     companion object {
+        /**
+         * What makes a statement row unique, so importing a file twice adds nothing. A refund carries the
+         * UPI reference of the payment it reverses, so the direction is part of the key.
+         */
+        fun importKey(entry: StatementEntry): String = with(entry) {
+            "paytm:" + (refNo?.let { "$it:$type" } ?: "$timestamp:$amountPaise:$type:${Categorizer.normalize(counterparty ?: vpa.orEmpty())}")
+        }
+
         const val SOURCE_LABEL = "Paytm statement"
         private const val MAX_FILE_BYTES = 20 * 1024 * 1024
         private const val DAY_MS = 24 * 60 * 60 * 1000L
 
-        /** Matches a tag like "Food" or "Bills & Recharges" to a category by its first word. */
+        /**
+         * The category for an imported payment, and whether its Paytm tag chose it. A tag is kept like a
+         * manual category, except that Paytm files subscriptions such as YouTube under Bill Payments, so a
+         * payment the keyword rules know as a subscription stays one.
+         */
+        fun categorize(
+            entry: StatementEntry,
+            merchant: String,
+            categories: List<CategoryEntity>,
+            categorizer: Categorizer,
+        ): Pair<Long, Boolean> {
+            val kind = if (entry.type == TxnType.DEBIT) CategoryKind.EXPENSE else CategoryKind.INCOME
+            val byRules = categorizer.categorize(
+                CategorizerInput(entry.type, PaymentMode.UPI, merchant, entry.vpa, entry.summary, entry.personTransfer, internalTransfer = false),
+            )
+            val tagged = entry.tags.firstNotNullOfOrNull { categoryForTag(it, categories, kind) }
+                ?.takeUnless { it == CategoryIds.BILLS && byRules == CategoryIds.SUBSCRIPTIONS }
+            return (tagged ?: byRules) to (tagged != null)
+        }
+
+        /**
+         * Matches a tag like "Food" or "Bills & Recharges" to a category by its first word, falling back to
+         * Paytm's own tag names ("Medical" is Health). A tag only counts for the kind of payment it fits.
+         */
         fun categoryForTag(tag: String, categories: List<CategoryEntity>, kind: CategoryKind): Long? {
             val words = Categorizer.normalize(tag).split(' ').filter { it.isNotEmpty() }
             if (words.isEmpty()) return null
-            return categories.firstOrNull { category ->
+            categories.firstOrNull { category ->
                 category.kind == kind && Categorizer.normalize(category.name).split(' ').firstOrNull() == words.first()
-            }?.id
+            }?.let { return it.id }
+            val names = PAYTM_TAGS.getValue(kind)
+            val known = names[words.joinToString(" ")] ?: names[words.first()] ?: return null
+            return known.takeIf { id -> categories.any { it.id == id && it.kind == kind } }
         }
+
+        /**
+         * Paytm tags (and close variants) whose names don't start like a category's. Paytm's catch-alls,
+         * such as Miscellaneous and Services, are left to the keyword rules.
+         */
+        private val PAYTM_TAGS: Map<CategoryKind, Map<String, Long>> = mapOf(
+            CategoryKind.EXPENSE to mapOf(
+                "bill" to CategoryIds.BILLS,
+                "recharge" to CategoryIds.BILLS,
+                "recharges" to CategoryIds.BILLS,
+                "utilities" to CategoryIds.BILLS,
+                "medical" to CategoryIds.HEALTH,
+                "medicine" to CategoryIds.HEALTH,
+                "medicines" to CategoryIds.HEALTH,
+                "pharmacy" to CategoryIds.HEALTH,
+                "taxi" to CategoryIds.TRANSPORT,
+                "cab" to CategoryIds.TRANSPORT,
+                "auto" to CategoryIds.TRANSPORT,
+                "commute" to CategoryIds.TRANSPORT,
+                "money transfer" to CategoryIds.TRANSFERS,
+                "money sent" to CategoryIds.TRANSFERS,
+                "transfer" to CategoryIds.TRANSFERS,
+            ),
+            CategoryKind.INCOME to mapOf(
+                "money received" to CategoryIds.TRANSFERS_IN,
+                "money transfer" to CategoryIds.TRANSFERS_IN,
+                "refund" to CategoryIds.REFUNDS,
+                "cashback" to CategoryIds.REFUNDS,
+                "reversal" to CategoryIds.REFUNDS,
+            ),
+        )
     }
 }

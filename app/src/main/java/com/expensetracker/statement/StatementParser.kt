@@ -341,8 +341,9 @@ object StatementParser {
         """(add|added|adding|load|loaded|top[ -]?up|topup)\b.{0,30}upi lite|upi lite\b.{0,30}(top[ -]?up|topup|load|added)""",
     )
     private val SENT_TO_PERSON = Regex("""^(money )?sent to""")
+    // Paytm describes autopays as "Automatic payment for Youtube" (or "of ₹375 setup for Naukri" when one is set up).
     private val LEADING_VERB = Regex(
-        """^\s*(paid to|payment to|money sent to|sent to|transferred to|received from|money received from|refund from|cashback from|paid for|bill paid to|paid)\s*:?\s+""",
+        """^\s*(paid to|payment to|money sent to|sent to|transferred to|received from|money received from|refund from|cashback from|paid for|bill paid to|automatic payment (?:of \S+ setup )?for|recharge of|paid)\s*:?\s+""",
         RegexOption.IGNORE_CASE,
     )
     private val INLINE_REF = Regex("""(?i)\b(?:upi\s*)?ref(?:erence)?\.?\s*(?:no\.?)?\s*[:#-]?\s*([0-9]{9,16})\b""")
