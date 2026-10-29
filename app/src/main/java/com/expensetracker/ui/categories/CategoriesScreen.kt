@@ -64,16 +64,16 @@ fun CategoriesScreen(onBack: () -> Unit, viewModel: CategoriesViewModel = hiltVi
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item { ScreenTitle("Categories", onBack = onBack) }
-            item { SectionHeader("Spending", "Matched against the merchant name. Anything unmatched goes to Others.") }
+            item { SectionHeader("Spending", "Matched by merchant name. Anything else goes to Others.") }
             item {
                 CategoryGroup(categories.filter { it.kind == CategoryKind.EXPENSE }) { editing = it }
             }
-            item { SectionHeader("Income", "Matched against the sender and the message text.") }
+            item { SectionHeader("Income", "Matched by sender and message text.") }
             item {
                 CategoryGroup(categories.filter { it.kind == CategoryKind.INCOME }) { editing = it }
             }
             if (rules.isNotEmpty()) {
-                item { SectionHeader("Merchants you've sorted", "These win over keywords. Remove one to go back to automatic.") }
+                item { SectionHeader("Merchants you've sorted", "These come before keywords. Remove one to undo it.") }
                 item {
                     AppCard(contentPadding = PaddingValues(vertical = 6.dp)) {
                         rules.forEachIndexed { index, rule ->
@@ -150,8 +150,8 @@ private fun CategoryGroup(categories: List<CategoryEntity>, onEdit: (CategoryEnt
 @Composable
 private fun CategoryRow(category: CategoryEntity, onClick: () -> Unit) {
     val description = when {
-        category.id == CategoryIds.OTHERS -> "Anything that doesn't match another category"
-        category.id == CategoryIds.OTHER_INCOME -> "Money in that doesn't match another category"
+        category.id == CategoryIds.OTHERS -> "Anything not matched elsewhere"
+        category.id == CategoryIds.OTHER_INCOME -> "Money in not matched elsewhere"
         category.keywords.isEmpty() -> "No keywords yet"
         else -> category.keywords.take(5).joinToString(", ") +
             if (category.keywords.size > 5) " +${category.keywords.size - 5} more" else ""
@@ -196,7 +196,7 @@ private fun RuleRow(rule: MerchantRuleEntity, category: CategoryEntity?, onForge
             )
         }
         IconButton(onClick = onForget) {
-            Icon(Icons.Rounded.Close, contentDescription = "Forget ${rule.label}")
+            Icon(Icons.Rounded.Close, contentDescription = "Remove ${rule.label}")
         }
     }
 }
@@ -254,7 +254,7 @@ private fun CategoryEditor(
                     value = keywords,
                     onValueChange = { keywords = it },
                     label = { Text("Keywords") },
-                    supportingText = { Text("Comma separated, e.g. \"chai point, tea stall\"") },
+                    supportingText = { Text("Separate with commas, like: chai point, tea stall") },
                     minLines = 3,
                     modifier = Modifier.fillMaxWidth(),
                 )

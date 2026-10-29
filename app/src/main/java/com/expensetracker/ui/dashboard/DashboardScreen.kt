@@ -178,7 +178,7 @@ private fun ImportProgressCard(running: SyncStatus.Running) {
             Spacer(Modifier.height(10.dp))
             Text(
                 if (running.total > 0) {
-                    "${running.scanned} of ${running.total} messages checked · ${running.found} transactions found"
+                    "${running.scanned} of ${running.total} messages · ${running.found} transactions"
                 } else {
                     "Starting…"
                 },
@@ -232,7 +232,7 @@ private fun SummaryCard(state: DashboardUiState, onMonthChange: (YearMonth) -> U
         Spacer(Modifier.height(18.dp))
         val net = state.receivedPaise - state.spentPaise
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            HeroStat(Icons.Rounded.SouthWest, "Money in", Money.format(state.receivedPaise, false), Modifier.weight(1f))
+            HeroStat(Icons.Rounded.SouthWest, "Received", Money.format(state.receivedPaise, false), Modifier.weight(1f))
             HeroStat(
                 Icons.Rounded.Savings,
                 if (net >= 0) "Left over" else "Overspent",
@@ -250,7 +250,7 @@ private fun Comparison(state: DashboardUiState) {
     val previousMonth = state.month.minusMonths(1).monthName()
     if (previous <= 0) {
         Text(
-            if (state.spentPaise > 0) "Nothing recorded for $previousMonth to compare with" else "Nothing spent yet",
+            if (state.spentPaise > 0) "Nothing in $previousMonth to compare" else "Nothing spent yet",
             style = MaterialTheme.typography.bodySmall,
             color = colors.onHeroMuted,
         )
@@ -306,7 +306,7 @@ private fun InsightsRow(state: DashboardUiState) {
             icon = { CategoryTile(top?.category, size = 32.dp) },
             label = "Top category",
             value = top?.category?.name ?: "—",
-            detail = top?.let { "${(it.share * 100).roundToInt()}% share" } ?: "",
+            detail = top?.let { "${(it.share * 100).roundToInt()}% of total" } ?: "",
         )
         Insight(
             modifier = Modifier.weight(1f),
@@ -502,8 +502,8 @@ private fun EmptyMonth(state: DashboardUiState) {
     val note = when {
         state.sync is SyncStatus.Running -> "Still reading your messages…"
         historyStart != null && state.month.startMillis() < historyStart ->
-            "Messages before ${historyStart.dateLabel()} haven't been read yet. Scan older messages from Settings."
-        else -> "Bank messages for this month will show up here."
+            "Messages before ${historyStart.dateLabel()} aren't read yet. You can read them in Settings."
+        else -> "This month's transactions will show up here."
     }
     Column(
         Modifier.fillMaxWidth().padding(vertical = 28.dp, horizontal = 16.dp),

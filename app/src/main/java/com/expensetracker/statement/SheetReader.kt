@@ -24,9 +24,9 @@ object SheetReader {
     fun read(bytes: ByteArray): List<List<String>> = when {
         bytes.startsWith("PK") -> readXlsx(bytes)
         bytes.size >= 2 && bytes[0] == 0xD0.toByte() && bytes[1] == 0xCF.toByte() ->
-            throw StatementFormatException("Old .xls files can't be read. Download the statement as Excel (.xlsx) instead.")
+            throw StatementFormatException("Old .xls files aren't supported. Download the .xlsx version.")
         bytes.startsWith("%PDF") ->
-            throw StatementFormatException("PDF statements can't be read. Download the statement as Excel instead.")
+            throw StatementFormatException("PDFs aren't supported. Download the Excel version.")
         else -> readDelimited(bytes.decodeToString().removePrefix("﻿"))
     }
 
@@ -51,7 +51,7 @@ object SheetReader {
         val shared = parts["xl/sharedStrings.xml"]?.let(::parseSharedStrings).orEmpty()
         val sheet = firstSheetPath(parts)?.let { parts[it] }
             ?: parts.entries.filter { it.key.startsWith("xl/worksheets/sheet") }.minByOrNull { it.key }?.value
-            ?: throw StatementFormatException("This file has no worksheet in it.")
+            ?: throw StatementFormatException("This file has no data.")
         return parseSheet(sheet, shared)
     }
 
@@ -258,7 +258,7 @@ internal fun InputStream.readUpTo(limit: Int): ByteArray {
         val read = read(buffer)
         if (read < 0) break
         total += read
-        if (total > limit) throw StatementFormatException("This file is too large to import.")
+        if (total > limit) throw StatementFormatException("This file is too big to import.")
         out.write(buffer, 0, read)
     }
     return out.toByteArray()

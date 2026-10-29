@@ -158,7 +158,7 @@ private fun TransactionDetails(
             if (txn.excluded) {
                 Spacer(Modifier.width(12.dp))
                 PillLabel(
-                    "Not counted",
+                    "Not in totals",
                     MaterialTheme.colorScheme.surfaceContainerHighest,
                     MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -184,7 +184,7 @@ private fun TransactionDetails(
             ) {
                 Checkbox(checked = rememberMerchant, onCheckedChange = { rememberMerchant = it })
                 Text(
-                    if (txn.type == TxnType.DEBIT) "Use for all payments to $merchantLabel" else "Use for all money from $merchantLabel",
+                    if (txn.type == TxnType.DEBIT) "Apply to all payments to $merchantLabel" else "Apply to all money from $merchantLabel",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -213,12 +213,12 @@ private fun TransactionDetails(
         Panel {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Count in totals", style = MaterialTheme.typography.titleSmall)
+                    Text("Include in totals", style = MaterialTheme.typography.titleSmall)
                     Text(
                         if (txn.internalTransfer) {
-                            "Looks like a card bill payment or a transfer between your own accounts"
+                            "Looks like a card bill or a transfer to yourself"
                         } else {
-                            "Turn off for money that isn't really spending or income, like moving it to yourself"
+                            "Turn off for transfers to yourself"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -233,7 +233,7 @@ private fun TransactionDetails(
         val imported = txn.source == TxnSource.PAYTM
         Text(if (imported) "Statement entry" else "Original message", style = MaterialTheme.typography.titleMedium)
         Text(
-            if (imported) "Imported from your Paytm statement" else "From ${txn.sender}",
+            if (imported) "From your Paytm statement" else "From ${txn.sender}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

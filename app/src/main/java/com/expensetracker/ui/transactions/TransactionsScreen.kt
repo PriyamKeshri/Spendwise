@@ -216,7 +216,7 @@ private fun EmptyResults(state: TransactionsUiState) {
         }
         Spacer(Modifier.height(12.dp))
         Text(
-            if (filtered) "Nothing matches these filters" else "No transactions in ${state.month.label()}",
+            if (filtered) "No matching transactions" else "No transactions in ${state.month.label()}",
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
         )

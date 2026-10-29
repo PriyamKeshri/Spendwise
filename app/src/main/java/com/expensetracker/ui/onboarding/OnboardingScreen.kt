@@ -85,11 +85,10 @@ fun OnboardingScreen(hasPermission: Boolean, onStart: (months: Int) -> Unit) {
             )
         }
         Spacer(Modifier.height(24.dp))
-        Text("Your spending, sorted automatically", style = MaterialTheme.typography.headlineLarge)
+        Text("See where your money goes", style = MaterialTheme.typography.headlineLarge)
         Spacer(Modifier.height(10.dp))
         Text(
-            "Spendwise reads the alerts your bank sends by SMS and turns them into a monthly picture " +
-                "of where your money goes.",
+            "Spendwise reads your bank SMS and sorts every payment for you.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -98,19 +97,19 @@ fun OnboardingScreen(hasPermission: Boolean, onStart: (months: Int) -> Unit) {
         AppCard(contentPadding = PaddingValues(vertical = 8.dp)) {
             Feature(
                 Icons.Rounded.MarkEmailRead,
-                "Only bank alerts",
-                "Debits and credits from SBI and other banks. OTPs, offers and personal chats are skipped.",
+                "Only bank messages",
+                "Money in and out from SBI and other banks. OTPs, offers and chats are ignored.",
             )
-            Feature(Icons.Rounded.Lock, "Stays on your phone", "No account and no cloud. The app doesn't even have internet access.")
+            Feature(Icons.Rounded.Lock, "Stays on your phone", "No account, no cloud. The app has no internet access.")
             Feature(
                 Icons.Rounded.AutoAwesome,
                 "Sorted for you",
-                "Food, shopping, bills and more. Unknown merchants go to Others, and it learns when you correct it.",
+                "Food, shopping, bills and more. Fix a category once and it remembers.",
             )
         }
 
         Spacer(Modifier.height(28.dp))
-        Text("Read past messages from", style = MaterialTheme.typography.titleMedium)
+        Text("How far back?", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(10.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -122,7 +121,7 @@ fun OnboardingScreen(hasPermission: Boolean, onStart: (months: Int) -> Unit) {
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            "Whole months are read, so “Last month” includes all of ${YearMonth.now().minusMonths(1).label()}.",
+            "“Last month” covers all of ${YearMonth.now().minusMonths(1).label()}.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -140,8 +139,7 @@ fun OnboardingScreen(hasPermission: Boolean, onStart: (months: Int) -> Unit) {
         if (denied && !hasPermission) {
             Spacer(Modifier.height(16.dp))
             Text(
-                "SMS access is needed to find your transactions. If Android doesn't ask again, turn on " +
-                    "SMS under Permissions in the app's settings.",
+                "Spendwise needs SMS access to find your payments. If Android doesn't ask, allow SMS in the app's settings.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
