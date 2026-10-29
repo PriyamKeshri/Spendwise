@@ -100,7 +100,7 @@ class SettingsViewModel @Inject constructor(
                 val count = withContext(Dispatchers.IO) { writeCsv(uri) }
                 "Exported $count transactions"
             } catch (e: IOException) {
-                "Export failed: ${e.message}"
+                "Couldn't export: ${e.message}"
             }
             messageChannel.send(message)
         }
@@ -137,6 +137,6 @@ class SettingsViewModel @Inject constructor(
 
     private companion object {
         val CSV_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-        const val UNREADABLE = "This file couldn't be read as a statement."
+        const val UNREADABLE = "Couldn't read this file as a statement."
     }
 }

@@ -92,18 +92,18 @@ fun SettingsScreen(onOpenCategories: () -> Unit, viewModel: SettingsViewModel = 
             val start = historyStart
             val scanned = when {
                 sync is SyncStatus.Running -> "Reading messages…"
-                start == 0L -> "Every message has been read · $count transactions"
-                start != null -> "Read since ${start.dateLabel()} · $count transactions"
-                else -> "Not scanned yet"
+                start == 0L -> "All messages read · $count transactions"
+                start != null -> "Messages since ${start.dateLabel()} · $count transactions"
+                else -> "Not read yet"
             }
             SectionLabel("Messages")
             AppCard(contentPadding = PaddingValues(vertical = 6.dp)) {
-                SettingRow(Icons.Rounded.CalendarMonth, "Scan older messages", scanned) { showScanDialog = true }
+                SettingRow(Icons.Rounded.CalendarMonth, "Read older messages", scanned) { showScanDialog = true }
                 RowDivider()
                 SettingRow(
                     Icons.Rounded.Refresh,
                     "Check for new messages",
-                    "New bank messages are picked up automatically as they arrive",
+                    "New messages are added automatically",
                     onClick = viewModel::checkNow,
                 )
             }
@@ -113,7 +113,7 @@ fun SettingsScreen(onOpenCategories: () -> Unit, viewModel: SettingsViewModel = 
                 SettingRow(
                     Icons.Rounded.Category,
                     "Categories and keywords",
-                    "Change how payments are sorted, and the merchants you've sorted yourself",
+                    "Change how payments are sorted",
                     onClick = onOpenCategories,
                 )
             }
@@ -126,12 +126,12 @@ fun SettingsScreen(onOpenCategories: () -> Unit, viewModel: SettingsViewModel = 
                     if (importState == SettingsViewModel.ImportState.Running) {
                         "Importing…"
                     } else {
-                        "Adds payments that never came by SMS, like UPI Lite. In Paytm: Balance & History → " +
+                        "Add payments that had no SMS, like UPI Lite. In Paytm: Balance & History → " +
                             "Download UPI Statement → Excel."
                     },
                 ) { importLauncher.launch(STATEMENT_TYPES) }
                 RowDivider()
-                SettingRow(Icons.Rounded.IosShare, "Export to CSV", "Save every transaction as a spreadsheet") {
+                SettingRow(Icons.Rounded.IosShare, "Export to CSV", "Save all transactions as a spreadsheet") {
                     exportLauncher.launch("expenses-${LocalDate.now()}.csv")
                 }
             }
@@ -141,8 +141,7 @@ fun SettingsScreen(onOpenCategories: () -> Unit, viewModel: SettingsViewModel = 
                 SettingRow(
                     Icons.Rounded.Lock,
                     "Stays on your phone",
-                    "Messages are read and stored only on this device. The app has no internet permission, " +
-                        "so nothing can be uploaded.",
+                    "Everything stays on this phone. The app has no internet access.",
                 )
             }
 
@@ -151,7 +150,7 @@ fun SettingsScreen(onOpenCategories: () -> Unit, viewModel: SettingsViewModel = 
                 SettingRow(
                     Icons.Rounded.Info,
                     "Version ${appVersion()}",
-                    "Set in Plus Jakarta Sans, used under the SIL Open Font License",
+                    "Font: Plus Jakarta Sans (SIL Open Font License)",
                 )
             }
         }
@@ -195,19 +194,19 @@ private val STATEMENT_TYPES = arrayOf(
 private fun importSummary(report: ImportReport): String = buildList {
     add(
         if (report.added == 0) {
-            "Nothing new: everything in this file is already in Spendwise."
+            "Nothing new. Everything in this file is already here."
         } else {
             "Added ${plural(report.added, "payment")}."
         },
     )
     if (report.added > 0 && report.alreadyTracked > 0) {
-        add("${plural(report.alreadyTracked, "payment")} ${if (report.alreadyTracked == 1) "was" else "were"} already tracked.")
+        add("${plural(report.alreadyTracked, "payment")} ${if (report.alreadyTracked == 1) "was" else "were"} already here.")
     }
     if (report.skippedNotCompleted > 0) {
         add("Skipped ${plural(report.skippedNotCompleted, "failed or pending payment")}.")
     }
     if (report.skippedLiteTopUps > 0) {
-        add("Skipped ${plural(report.skippedLiteTopUps, "UPI Lite top-up")}, since the Lite payments themselves are counted.")
+        add("Skipped ${plural(report.skippedLiteTopUps, "UPI Lite top-up")}. The Lite payments are counted instead.")
     }
     if (report.unreadableRows > 0) {
         add("${plural(report.unreadableRows, "row")} couldn't be read.")
@@ -271,11 +270,11 @@ private fun ScanHistoryDialog(onDismiss: () -> Unit, onScan: (HistoryRange) -> U
     var selected by rememberSaveable { mutableStateOf(HistoryRange.ONE_YEAR) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Scan older messages") },
+        title = { Text("Read older messages") },
         text = {
             Column {
                 Text(
-                    "Messages already imported are skipped, and your category changes are kept.",
+                    "Messages already read are skipped. Your changes are kept.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.height(8.dp))
@@ -294,7 +293,7 @@ private fun ScanHistoryDialog(onDismiss: () -> Unit, onScan: (HistoryRange) -> U
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onScan(selected) }) { Text("Scan") } },
+        confirmButton = { TextButton(onClick = { onScan(selected) }) { Text("Read") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

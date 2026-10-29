@@ -78,7 +78,7 @@ fun InsightsScreen(viewModel: InsightsViewModel = hiltViewModel()) {
             insights.spentPaise == 0L && insights.receivedPaise == 0L -> item { EmptyMonth(state.month) }
             else -> {
                 item { MonthSummary(insights) }
-                item { SectionHeader("Ways to save", "Estimates from your own spending") }
+                item { SectionHeader("Ways to save", "Based on your spending") }
                 if (insights.tips.isEmpty()) {
                     item { NoTips() }
                 } else {
@@ -87,22 +87,22 @@ fun InsightsScreen(viewModel: InsightsViewModel = hiltViewModel()) {
                 if (insights.categoryTrends.isNotEmpty()) {
                     item {
                         SectionHeader(
-                            "Compared with your usual",
+                            "Compared to usual",
                             when {
-                                insights.usualSpendPaise == null -> "No earlier months to compare with yet"
-                                insights.inProgress -> "Where each category is heading this month"
-                                else -> "Your average of recent months"
+                                insights.usualSpendPaise == null -> "No earlier months yet"
+                                insights.inProgress -> "Expected by the end of the month"
+                                else -> "Against your recent average"
                             },
                         )
                     }
                     item { TrendsCard(insights) }
                 }
                 if (insights.recurring.isNotEmpty()) {
-                    item { SectionHeader("Recurring payments", "Paid in more than one month for about the same amount") }
+                    item { SectionHeader("Recurring payments", "Similar amounts paid in different months") }
                     item { RecurringCard(insights) }
                 }
                 if (insights.topMerchants.isNotEmpty()) {
-                    item { SectionHeader("Where most of it went", null) }
+                    item { SectionHeader("Where you spent most", null) }
                     item { MerchantsCard(insights) }
                 }
                 item { SectionHeader("Patterns", null) }
@@ -117,8 +117,8 @@ private fun MonthSummary(insights: Insights) {
     val rate = insights.savingsRate
     val headline = when {
         rate == null -> "${Money.format(insights.spentPaise, false)} spent"
-        rate >= 0 -> "You kept ${(rate * 100).roundToInt()}% of what came in"
-        else -> "You spent ${(abs(rate) * 100).roundToInt()}% more than came in"
+        rate >= 0 -> "You saved ${(rate * 100).roundToInt()}% of what you received"
+        else -> "You spent ${(abs(rate) * 100).roundToInt()}% more than you received"
     }
     Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.primaryContainer) {
         Column(Modifier.fillMaxWidth().padding(20.dp)) {
@@ -126,14 +126,14 @@ private fun MonthSummary(insights: Insights) {
             Spacer(Modifier.height(6.dp))
             Text(
                 listOf(
-                    "In ${Money.format(insights.receivedPaise, false)}",
-                    "out ${Money.format(insights.spentPaise, false)}",
+                    "Received ${Money.format(insights.receivedPaise, false)}",
+                    "Spent ${Money.format(insights.spentPaise, false)}",
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.bodyMedium.money(),
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
             )
             val facts = buildList {
-                insights.projectedSpendPaise?.let { add("On pace for" to Money.format(it, false)) }
+                insights.projectedSpendPaise?.let { add("By month end" to Money.format(it, false)) }
                 insights.usualSpendPaise?.let { add("Usual month" to Money.format(it, false)) }
             }
             if (facts.isNotEmpty()) {
@@ -180,7 +180,7 @@ fun TipCard(tip: SavingTip, month: YearMonth, modifier: Modifier = Modifier) {
                 Text(copy.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 tip.monthlySavingPaise?.takeIf { it > 0 }?.let { saving ->
                     Spacer(Modifier.height(10.dp))
-                    PillLabel("Save ~${about(saving)}/month", appColors.downContainer, appColors.onDownContainer)
+                    PillLabel("Save ~${about(saving)} a month", appColors.downContainer, appColors.onDownContainer)
                 }
             }
         }
@@ -194,7 +194,7 @@ private fun NoTips() {
             IconTile(Icons.Rounded.CheckCircle, appColors.income)
             Spacer(Modifier.width(14.dp))
             Text(
-                "Nothing stands out this month. Your spending looks steady.",
+                "No tips this month. Your spending looks steady.",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f),
             )
@@ -279,7 +279,7 @@ private fun RecurringCard(insights: Insights) {
         }
         RowDivider()
         Text(
-            "About ${Money.format(insights.recurring.sumOf { it.monthlyPaise }, false)} a month in all",
+            "About ${Money.format(insights.recurring.sumOf { it.monthlyPaise }, false)} a month in total",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
@@ -317,7 +317,7 @@ private fun PatternsGrid(insights: Insights) {
     val p = insights.patterns
     val cells = listOf(
         "Weekends" to (p.weekendShare?.let { "${(it * 100).roundToInt()}%" } ?: "—") to "of spending",
-        "Under ₹200" to "${p.smallCount}" to "${Money.format(p.smallTotalPaise, false)} in all",
+        "Under ₹200" to "${p.smallCount}" to "${Money.format(p.smallTotalPaise, false)} in total",
         "Busiest day" to (p.busiestDay?.getDisplayName(TextStyle.FULL, Locale.getDefault()) ?: "—") to
             Money.format(p.busiestDayPaise, false),
         "Cash" to Money.format(p.cashPaise, false) to "ATM withdrawals",
@@ -363,10 +363,10 @@ private fun EmptyMonth(month: YearMonth) {
             Icon(Icons.Rounded.Insights, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
         }
         Spacer(Modifier.height(14.dp))
-        Text("Nothing to analyse in ${month.label()}", style = MaterialTheme.typography.titleMedium)
+        Text("No data for ${month.label()}", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(4.dp))
         Text(
-            "Insights appear once ${month.monthName()} has some transactions.",
+            "Insights show up once ${month.monthName()} has transactions.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

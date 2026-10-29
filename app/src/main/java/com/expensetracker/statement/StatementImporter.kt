@@ -38,7 +38,7 @@ class StatementImporter @Inject constructor(
             ?: throw StatementFormatException("Couldn't open that file.")
         val parsed = StatementParser.parse(SheetReader.read(bytes))
         if (parsed.entries.isEmpty() && parsed.skippedNotCompleted == 0 && parsed.skippedLiteTopUps == 0) {
-            throw StatementFormatException("No transactions were found in this file.")
+            throw StatementFormatException("No transactions found in this file.")
         }
 
         val categorizer = repository.newCategorizer()

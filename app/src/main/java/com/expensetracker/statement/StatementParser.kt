@@ -53,7 +53,7 @@ object StatementParser {
 
     fun parse(rows: List<List<String>>, zone: ZoneId = ZoneId.systemDefault()): ParsedStatement {
         val headerIndex = rows.take(HEADER_SEARCH_ROWS).indexOfFirst(::isHeader)
-        if (headerIndex < 0) throw StatementFormatException("Couldn't find the date and amount columns in this file.")
+        if (headerIndex < 0) throw StatementFormatException("Couldn't find the date and amount columns.")
         val headers = rows[headerIndex]
         val columns = HashMap<Field, Int>()
         headers.forEachIndexed { index, header -> classify(header)?.let { columns.putIfAbsent(it, index) } }

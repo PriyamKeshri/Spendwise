@@ -82,7 +82,7 @@ fun TransactionRow(
         Column(horizontalAlignment = Alignment.End) {
             SignedAmount(txn)
             if (txn.excluded) {
-                Text("Not counted", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Not in totals", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
