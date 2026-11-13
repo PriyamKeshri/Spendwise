@@ -34,9 +34,14 @@ interface TransactionDao {
     /** Once the individual UPI Lite payments are imported, the bank's Lite top-up debits would count them twice. */
     @Query(
         "UPDATE transactions SET excluded = 1, internal_transfer = 1 WHERE exclude_locked = 0 AND type = 'DEBIT' " +
-            "AND source = 'SMS' AND body LIKE '%upi lite%' AND timestamp BETWEEN :from AND :to",
+            "AND source IN ('SMS', 'BANK') AND (body LIKE '%upi lite%' OR merchant = 'UPI Lite top-up') " +
+            "AND timestamp BETWEEN :from AND :to",
     )
     suspend fun excludeUpiLiteTopUps(from: Long, to: Long): Int
+
+    /** Whether a UPI app statement has added UPI Lite payments in this period. */
+    @Query("SELECT EXISTS(SELECT 1 FROM transactions WHERE source = 'PAYTM' AND bank = 'UPI Lite' AND timestamp BETWEEN :from AND :to)")
+    suspend fun hasLitePayments(from: Long, to: Long): Boolean
 
     @Query("SELECT * FROM transactions WHERE timestamp >= :start AND timestamp < :end ORDER BY timestamp DESC")
     fun observeBetween(start: Long, end: Long): Flow<List<TransactionEntity>>

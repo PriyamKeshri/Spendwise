@@ -1,5 +1,6 @@
 package com.expensetracker.statement
 
+import com.expensetracker.model.PaymentMode
 import com.expensetracker.model.TxnType
 import com.expensetracker.sms.SmsParser
 import java.math.BigDecimal
@@ -31,9 +32,20 @@ data class StatementEntry(
     val tags: List<String>,
     /** The row as "Column: value" lines, shown in the transaction details. */
     val summary: String,
+    val mode: PaymentMode = PaymentMode.UPI,
+    /** Bank statements give only the date, so the time is noon and matching uses the whole day. */
+    val hasTime: Boolean = true,
+    /** The row's description as written in the statement. */
+    val description: String = "",
 )
 
+/** A UPI app's export (like Paytm's) lists each payment with a signed amount; a bank statement has debit and credit columns. */
+enum class StatementKind { UPI_APP, BANK }
+
 data class ParsedStatement(
+    val kind: StatementKind,
+    /** The bank named at the top of a bank statement, like "SBI". */
+    val bank: String?,
     val entries: List<StatementEntry>,
     /** Failed, pending or reversed payments, which never moved money. */
     val skippedNotCompleted: Int,
@@ -44,8 +56,9 @@ data class ParsedStatement(
 )
 
 /**
- * Reads a UPI statement (Paytm's Excel export, or similar) whose columns are recognised by their
- * headings rather than their position, so a reordered or renamed column doesn't break the import.
+ * Reads a UPI app statement (Paytm's Excel export, or similar) or a bank statement (SBI's, or similar).
+ * Columns are recognised by their headings rather than their position, so a reordered or renamed
+ * column doesn't break the import.
  */
 object StatementParser {
 
@@ -57,6 +70,18 @@ object StatementParser {
         val headers = rows[headerIndex]
         val columns = HashMap<Field, Int>()
         headers.forEachIndexed { index, header -> classify(header)?.let { columns.putIfAbsent(it, index) } }
+        // A bank statement names the bank and account above the table.
+        val preamble = rows.take(headerIndex).joinToString(" ") { it.joinToString(" ") }
+        val statementBank = knownBank(preamble.lowercase())
+        // Debit and credit columns alone don't make a bank statement (some apps export that way too);
+        // a running balance or a named bank does.
+        val hasBalance = headers.any { it.contains("balance", ignoreCase = true) }
+        val kind = if ((Field.DEBIT in columns || Field.CREDIT in columns) && (hasBalance || statementBank != null)) {
+            StatementKind.BANK
+        } else {
+            StatementKind.UPI_APP
+        }
+        val statementTail = PREAMBLE_ACCOUNT.find(preamble)?.groupValues?.get(1)?.takeLast(4)
 
         val entries = ArrayList<StatementEntry>()
         var notCompleted = 0
@@ -76,7 +101,9 @@ object StatementParser {
                 notCompleted++
                 continue
             }
-            if (LITE_TOP_UP.containsMatchIn("$details $account $notes".lowercase())) {
+            // A UPI app lists the Lite payments themselves, so its top-ups would count them twice. A bank
+            // statement doesn't, so there the top-up is the only record of that money.
+            if (kind == StatementKind.UPI_APP && LITE_TOP_UP.containsMatchIn("$details $account $notes".lowercase())) {
                 liteTopUps++
                 continue
             }
@@ -91,26 +118,34 @@ object StatementParser {
                 null
             } ?: continue
 
-            val vpa = (VPA.find(cell(Field.PARTY_ID)) ?: VPA.find(details))?.value?.lowercase()
-            val name = counterpartyName(details, vpa)
+            val narration = if (kind == StatementKind.BANK) BankNarration.read(details) else null
+            val vpa = narration?.vpa ?: (VPA.find(cell(Field.PARTY_ID)) ?: VPA.find(details))?.value?.lowercase()
+            val name = if (narration?.structured == true) narration.name else counterpartyName(details, vpa)
             val phoneVpa = vpa?.substringBefore('@')?.let { PHONE.matches(it) } == true
+            // SBI's reference column holds "TRANSFER TO <account>", not a payment reference.
+            val refColumn = cell(Field.REF).takeUnless { kind == StatementKind.BANK && it.startsWith("TRANSFER", ignoreCase = true) }
             entries += StatementEntry(
                 timestamp = timestamp,
                 type = type,
                 amountPaise = amountPaise,
                 counterparty = name,
                 vpa = vpa,
-                refNo = reference(cell(Field.REF)) ?: reference(INLINE_REF.find(details)?.groupValues?.get(1).orEmpty()),
-                bank = bankName(account),
-                accountTail = ACCOUNT_TAIL.find(account)?.groupValues?.get(1)?.takeLast(4),
-                viaUpiLite = account.contains("upi lite", ignoreCase = true) ||
-                    (type == TxnType.DEBIT && details.contains("upi lite", ignoreCase = true)),
+                refNo = narration?.ref ?: reference(refColumn.orEmpty()) ?: reference(INLINE_REF.find(details)?.groupValues?.get(1).orEmpty()),
+                bank = if (kind == StatementKind.BANK) statementBank ?: knownBank(account.lowercase()) else bankName(account),
+                accountTail = statementTail ?: ACCOUNT_TAIL.find(account)?.groupValues?.get(1)?.takeLast(4),
+                viaUpiLite = kind == StatementKind.UPI_APP && (
+                    account.contains("upi lite", ignoreCase = true) ||
+                        (type == TxnType.DEBIT && details.contains("upi lite", ignoreCase = true))
+                    ),
                 personTransfer = phoneVpa || SENT_TO_PERSON.containsMatchIn(details.lowercase()),
                 tags = cell(Field.TAGS).split(',', ';', '|', '#').map { it.trim() }.filter { it.isNotEmpty() },
                 summary = summary(headers, row, columns[Field.DATE], columns[Field.TIME], timestamp, zone),
+                mode = narration?.mode ?: PaymentMode.UPI,
+                hasTime = hasTime(cell(Field.DATE), cell(Field.TIME)),
+                description = details,
             )
         }
-        return ParsedStatement(entries, notCompleted, liteTopUps, unreadable)
+        return ParsedStatement(kind, statementBank, entries, notCompleted, liteTopUps, unreadable)
     }
 
     // region Columns
@@ -207,26 +242,32 @@ object StatementParser {
     private fun reference(text: String): String? =
         text.trim().uppercase().filter { it.isLetterOrDigit() }.takeIf { ref -> ref.count(Char::isDigit) >= 6 }
 
+    /** The account column of a UPI app's export: a bank, UPI Lite, or blank for the app's own balance. */
     private fun bankName(account: String): String? {
         val a = account.lowercase()
         return when {
             a.isBlank() -> "Paytm"
             "upi lite" in a -> "UPI Lite"
-            "state bank" in a || Regex("""\bsbi\b""").containsMatchIn(a) -> "SBI"
-            "hdfc" in a -> "HDFC Bank"
-            "icici" in a -> "ICICI Bank"
-            "axis" in a -> "Axis Bank"
-            "kotak" in a -> "Kotak"
-            "yes bank" in a -> "Yes Bank"
-            "paytm payments" in a -> "Paytm Payments Bank"
-            "baroda" in a -> "Bank of Baroda"
-            "punjab national" in a || Regex("""\bpnb\b""").containsMatchIn(a) -> "PNB"
-            "canara" in a -> "Canara Bank"
-            "union bank" in a -> "Union Bank"
-            "idfc" in a -> "IDFC First"
-            "indusind" in a -> "IndusInd"
-            else -> account.replace(ACCOUNT_TAIL, "").trim().trim('-', ' ').take(24).ifEmpty { "Paytm" }
+            else -> knownBank(a) ?: account.replace(ACCOUNT_TAIL, "").trim().trim('-', ' ').take(24).ifEmpty { "Paytm" }
         }
+    }
+
+    /** A bank named in lowercase [text], by name or by its IFSC prefix. */
+    private fun knownBank(text: String): String? = when {
+        "state bank" in text || "sbin" in text || Regex("""\bsbi\b""").containsMatchIn(text) -> "SBI"
+        "hdfc" in text -> "HDFC Bank"
+        "icici" in text -> "ICICI Bank"
+        "axis" in text || "utib" in text -> "Axis Bank"
+        "kotak" in text || "kkbk" in text -> "Kotak"
+        "yes bank" in text || "yesb" in text -> "Yes Bank"
+        "paytm payments" in text -> "Paytm Payments Bank"
+        "baroda" in text -> "Bank of Baroda"
+        "punjab national" in text || Regex("""\bpnb\b""").containsMatchIn(text) -> "PNB"
+        "canara" in text -> "Canara Bank"
+        "union bank" in text -> "Union Bank"
+        "idfc" in text -> "IDFC First"
+        "indusind" in text -> "IndusInd"
+        else -> null
     }
 
     // endregion
@@ -245,7 +286,14 @@ object StatementParser {
         return dateTime.atZone(zone).toInstant().toEpochMilli()
     }
 
-    private fun String.clean() = replace(' ', ' ').replace(' ', ' ').replace(" IST", "")
+    /** Whether the row says when in the day it happened: a time column, a time in the date, or an Excel time fraction. */
+    private fun hasTime(date: String, time: String): Boolean {
+        if (time.isNotBlank() || CLOCK.containsMatchIn(date)) return true
+        val serial = date.clean().toDoubleOrNull() ?: return false
+        return serial in EXCEL_SERIAL_RANGE && serial % 1.0 != 0.0
+    }
+
+    private fun String.clean() =replace(' ', ' ').replace(' ', ' ').replace(" IST", "")
         .replace(SPACES, " ").trim()
 
     private fun parseDateTime(text: String): LocalDateTime? {
@@ -350,4 +398,6 @@ object StatementParser {
     private val VPA = Regex("""(?i)[a-z0-9][a-z0-9._\-]{1,63}@[a-z][a-z0-9]{1,20}""")
     private val PHONE = Regex("""^(?:\+?91)?[6-9][0-9]{9}$""")
     private val ACCOUNT_TAIL = Regex("""[x*\s-]*([0-9]{2,6})\s*\)?\s*$""", RegexOption.IGNORE_CASE)
+    private val PREAMBLE_ACCOUNT = Regex("""(?i)\b(?:account|a/c)\s*(?:number|no\.?)\s*:?\s*[x*]*([0-9]{4,})""")
+    private val CLOCK = Regex("""\d{1,2}:\d{2}""")
 }

@@ -101,6 +101,15 @@ object SmsParser {
         }
     }
 
+    /** A credit card bill payment (or the card company's receipt of one), which isn't new spending or income. */
+    fun isCardBillPayment(text: String, type: TxnType): Boolean {
+        val lower = text.replace(WHITESPACE, " ").lowercase()
+        return when (type) {
+            TxnType.DEBIT -> CARD_BILL_DEBIT.containsMatchIn(lower)
+            TxnType.CREDIT -> CARD_BILL_CREDIT.containsMatchIn(lower)
+        }
+    }
+
     /** True when [merchant] is a fallback label rather than a real name, so it must not be learned. */
     fun isGenericLabel(merchant: String): Boolean = merchant in genericLabels
 

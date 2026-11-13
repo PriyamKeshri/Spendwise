@@ -14,7 +14,8 @@ class StatementFormatException(message: String) : Exception(message)
 
 /**
  * Turns a spreadsheet into rows of cell text. Reads .xlsx (a zip of XML parts, so no spreadsheet
- * library is needed) and comma, semicolon or tab separated text. Numeric cells keep their raw value,
+ * library is needed) and comma, semicolon or tab separated text, including the text that some banks
+ * save with an .xls name. Numeric cells keep their raw value,
  * so a date stored as an Excel serial number comes through as e.g. "45941.6".
  */
 object SheetReader {
@@ -175,9 +176,15 @@ object SheetReader {
     // region delimited text
 
     private fun readDelimited(text: String): List<List<String>> {
-        val sample = text.lineSequence().filter { it.isNotBlank() }.take(10).toList()
+        val sample = text.lineSequence().filter { it.isNotBlank() }.take(60).toList()
         if (sample.isEmpty()) return emptyList()
-        val delimiter = listOf(',', ';', '\t').maxBy { d -> sample.sumOf { line -> line.count { it == d } } }
+        // Values rarely contain tabs, so rows with several of them mean a tab-separated file, even when the
+        // lines above the table (an address, say) are full of commas. SBI's ".xls" statement is one of these.
+        val delimiter = if (sample.count { line -> line.count { it == '\t' } >= 2 } >= 2) {
+            '\t'
+        } else {
+            listOf(',', ';').maxBy { d -> sample.sumOf { line -> line.count { it == d } } }
+        }
 
         val rows = ArrayList<List<String>>()
         var row = ArrayList<String>()

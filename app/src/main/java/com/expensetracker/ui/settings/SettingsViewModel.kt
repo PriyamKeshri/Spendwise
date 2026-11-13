@@ -124,7 +124,7 @@ class SettingsViewModel @Inject constructor(
                     txn.accountTail.orEmpty(),
                     txn.refNo.orEmpty(),
                     if (txn.excluded) "No" else "Yes",
-                    if (txn.source == TxnSource.PAYTM) StatementImporter.SOURCE_LABEL else "SMS",
+                    if (txn.source == TxnSource.SMS) "SMS" else txn.sender,
                 )
                 writer.appendLine(row.joinToString(",") { csvField(it) })
             }

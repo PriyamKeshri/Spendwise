@@ -8,6 +8,7 @@ import com.expensetracker.data.db.DefaultCategories
 import com.expensetracker.data.db.MerchantRuleEntity
 import com.expensetracker.data.db.TransactionEntity
 import com.expensetracker.model.CategoryKind
+import com.expensetracker.model.PaymentMode
 import com.expensetracker.sms.Categorizer
 import com.expensetracker.sms.CategorizerInput
 import com.expensetracker.sms.SmsParser
@@ -53,20 +54,26 @@ class ExpenseRepository @Inject constructor(private val db: AppDatabase) {
     /**
      * Adds rows from an imported statement, skipping payments Spendwise already has: the same UPI
      * reference, or (when either side lacks one) an SMS for the same amount within a few minutes.
+     * A bank statement gives only the date, so its rows match an SMS from anywhere in that day.
      * Returns how many rows were new.
      */
-    suspend fun insertImported(transactions: List<TransactionEntity>): Int = db.withTransaction {
+    suspend fun insertImported(rows: List<ImportRow>): Int = db.withTransaction {
         var added = 0
-        for (txn in transactions) {
+        for ((txn, dateOnly) in rows) {
             val type = txn.type.name
-            val from = txn.timestamp - SAME_PAYMENT_WINDOW_MS
-            val to = txn.timestamp + SAME_PAYMENT_WINDOW_MS
+            // A date-only row sits at noon, so half a day either side covers its whole day.
+            val window = if (dateOnly) HALF_DAY_MS else SAME_PAYMENT_WINDOW_MS
+            val from = txn.timestamp - window
+            val to = txn.timestamp + window
             val ref = txn.refNo
-            val known = if (ref != null) {
-                transactionDao.existsByRef(ref, txn.amountPaise, type) ||
-                    transactionDao.existsSmsNear(txn.amountPaise, type, from, to, onlyWithoutRef = true)
-            } else {
-                transactionDao.existsSmsNear(txn.amountPaise, type, from, to, onlyWithoutRef = false)
+            // A UPI reference reads the same in the SMS and the statement, so it settles the match. Other
+            // references (a bank statement's NEFT number, say) may be written differently in the SMS, so
+            // those rows also match an SMS for the same amount that day.
+            val refSettles = ref != null && (!dateOnly || txn.mode == PaymentMode.UPI)
+            val known = when {
+                ref != null && transactionDao.existsByRef(ref, txn.amountPaise, type) -> true
+                refSettles -> transactionDao.existsSmsNear(txn.amountPaise, type, from, to, onlyWithoutRef = true)
+                else -> transactionDao.existsSmsNear(txn.amountPaise, type, from, to, onlyWithoutRef = false)
             }
             if (!known && transactionDao.insert(txn) != -1L) added++
         }
@@ -74,6 +81,8 @@ class ExpenseRepository @Inject constructor(private val db: AppDatabase) {
     }
 
     suspend fun excludeUpiLiteTopUps(from: Long, to: Long) = transactionDao.excludeUpiLiteTopUps(from, to)
+
+    suspend fun hasLitePayments(from: Long, to: Long) = transactionDao.hasLitePayments(from, to)
 
     /** Pairs up debits and credits between the user's own accounts so they don't count as spending. */
     suspend fun reconcileTransfers() = db.withTransaction {
@@ -138,5 +147,9 @@ class ExpenseRepository @Inject constructor(private val db: AppDatabase) {
     private companion object {
         /** A bank SMS and a statement row this close together, for the same amount, are one payment. */
         const val SAME_PAYMENT_WINDOW_MS = 10 * 60 * 1000L
+        const val HALF_DAY_MS = 12 * 60 * 60 * 1000L
     }
 }
+
+/** A statement row to import. A [dateOnly] row has no time of day, as in a bank statement. */
+data class ImportRow(val transaction: TransactionEntity, val dateOnly: Boolean)

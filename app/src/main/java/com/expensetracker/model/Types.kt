@@ -16,4 +16,4 @@ enum class PaymentMode(val label: String) {
 enum class CategoryKind { EXPENSE, INCOME }
 
 /** Where a transaction was found: a bank SMS, or a statement file the user imported. */
-enum class TxnSource { SMS, PAYTM }
+enum class TxnSource { SMS, PAYTM, BANK }

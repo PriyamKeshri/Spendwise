@@ -230,10 +230,10 @@ private fun TransactionDetails(
         }
 
         Spacer(Modifier.height(24.dp))
-        val imported = txn.source == TxnSource.PAYTM
+        val imported = txn.source != TxnSource.SMS
         Text(if (imported) "Statement entry" else "Original message", style = MaterialTheme.typography.titleMedium)
         Text(
-            if (imported) "From your Paytm statement" else "From ${txn.sender}",
+            if (imported) "From your ${txn.sender}" else "From ${txn.sender}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

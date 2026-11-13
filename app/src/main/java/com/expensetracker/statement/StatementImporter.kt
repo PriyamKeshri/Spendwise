@@ -6,8 +6,8 @@ import com.expensetracker.data.db.CategoryEntity
 import com.expensetracker.data.db.CategoryIds
 import com.expensetracker.data.db.TransactionEntity
 import com.expensetracker.data.repo.ExpenseRepository
+import com.expensetracker.data.repo.ImportRow
 import com.expensetracker.model.CategoryKind
-import com.expensetracker.model.PaymentMode
 import com.expensetracker.model.TxnSource
 import com.expensetracker.model.TxnType
 import com.expensetracker.sms.Categorizer
@@ -27,7 +27,11 @@ data class ImportReport(
     val unreadableRows: Int,
 )
 
-/** Imports a Paytm UPI statement file picked by the user. Everything happens on the phone. */
+/**
+ * Imports a statement file picked by the user: a UPI app's (like Paytm's) or a bank's (like SBI's). A bank
+ * statement covers payments from every UPI app, since they all come out of the account. Everything
+ * happens on the phone.
+ */
 class StatementImporter @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: ExpenseRepository,
@@ -43,7 +47,13 @@ class StatementImporter @Inject constructor(
 
         val categorizer = repository.newCategorizer()
         val categories = repository.allCategories()
-        val added = repository.insertImported(parsed.entries.map { it.toEntity(categorizer, categories) })
+        val source = if (parsed.kind == StatementKind.BANK) TxnSource.BANK else TxnSource.PAYTM
+        val label = if (source == TxnSource.BANK) "${parsed.bank ?: "Bank"} statement" else SOURCE_LABEL
+        val keys = importKeys(parsed.entries, source)
+        val rows = parsed.entries.mapIndexed { i, entry ->
+            ImportRow(entry.toEntity(categorizer, categories, source, label, keys[i]), dateOnly = !entry.hasTime)
+        }
+        val added = repository.insertImported(rows)
 
         // With the individual Lite payments in, the bank's top-up debits for the same period would count twice.
         val litePayments = parsed.entries.filter { it.viaUpiLite }
@@ -52,6 +62,13 @@ class StatementImporter @Inject constructor(
                 from = litePayments.minOf { it.timestamp } - DAY_MS,
                 to = litePayments.maxOf { it.timestamp } + DAY_MS,
             )
+        }
+        // The same, the other way round: a bank statement whose top-ups a UPI app statement already covers.
+        val topUps = rows.map { it.transaction }.filter { it.merchant == BankNarration.LITE_TOP_UP }
+        if (topUps.isNotEmpty()) {
+            val from = topUps.minOf { it.timestamp } - DAY_MS
+            val to = topUps.maxOf { it.timestamp } + DAY_MS
+            if (repository.hasLitePayments(from, to)) repository.excludeUpiLiteTopUps(from, to)
         }
         repository.reconcileTransfers()
 
@@ -64,27 +81,37 @@ class StatementImporter @Inject constructor(
         )
     }
 
-    private fun StatementEntry.toEntity(categorizer: Categorizer, categories: List<CategoryEntity>): TransactionEntity {
-        val merchant = counterparty ?: SmsParser.genericLabel(type, PaymentMode.UPI)
+    private fun StatementEntry.toEntity(
+        categorizer: Categorizer,
+        categories: List<CategoryEntity>,
+        source: TxnSource,
+        label: String,
+        key: String,
+    ): TransactionEntity {
+        val merchant = counterparty ?: SmsParser.genericLabel(type, mode)
         val (categoryId, tagged) = categorize(this, merchant, categories, categorizer)
+        // Card spends are counted when they happen, so paying the card bill isn't spending again.
+        val cardBill = SmsParser.isCardBillPayment("$merchant $description", type)
         return TransactionEntity(
             smsId = null,
             type = type,
             amountPaise = amountPaise,
             merchant = merchant,
             vpa = vpa,
-            mode = PaymentMode.UPI,
+            mode = mode,
             bank = bank,
             accountTail = accountTail,
             refNo = refNo,
             timestamp = timestamp,
             categoryId = categoryId,
             userCategorized = tagged,
+            excluded = cardBill,
             personTransfer = personTransfer,
-            sender = SOURCE_LABEL,
+            internalTransfer = cardBill,
+            sender = label,
             body = summary,
-            source = TxnSource.PAYTM,
-            importKey = importKey(this),
+            source = source,
+            importKey = key,
         )
     }
 
@@ -93,8 +120,21 @@ class StatementImporter @Inject constructor(
          * What makes a statement row unique, so importing a file twice adds nothing. A refund carries the
          * UPI reference of the payment it reverses, so the direction is part of the key.
          */
-        fun importKey(entry: StatementEntry): String = with(entry) {
-            "paytm:" + (refNo?.let { "$it:$type" } ?: "$timestamp:$amountPaise:$type:${Categorizer.normalize(counterparty ?: vpa.orEmpty())}")
+        fun importKey(entry: StatementEntry, source: TxnSource = TxnSource.PAYTM): String = with(entry) {
+            val prefix = if (source == TxnSource.BANK) "bank:" else "paytm:"
+            val who = if (source == TxnSource.BANK) description else counterparty ?: vpa.orEmpty()
+            prefix + (refNo?.let { "$it:$type" } ?: "$timestamp:$amountPaise:$type:${Categorizer.normalize(who)}")
+        }
+
+        /** Keys for a whole file. Rows that would share one, like two ₹10 charges on a day, get #2, #3 and so on. */
+        fun importKeys(entries: List<StatementEntry>, source: TxnSource): List<String> {
+            val seen = HashMap<String, Int>()
+            return entries.map { entry ->
+                val key = importKey(entry, source)
+                val n = (seen[key] ?: 0) + 1
+                seen[key] = n
+                if (n == 1) key else "$key#$n"
+            }
         }
 
         const val SOURCE_LABEL = "Paytm statement"
@@ -114,7 +154,7 @@ class StatementImporter @Inject constructor(
         ): Pair<Long, Boolean> {
             val kind = if (entry.type == TxnType.DEBIT) CategoryKind.EXPENSE else CategoryKind.INCOME
             val byRules = categorizer.categorize(
-                CategorizerInput(entry.type, PaymentMode.UPI, merchant, entry.vpa, entry.summary, entry.personTransfer, internalTransfer = false),
+                CategorizerInput(entry.type, entry.mode, merchant, entry.vpa, entry.summary, entry.personTransfer, internalTransfer = false),
             )
             val tagged = entry.tags.firstNotNullOfOrNull { categoryForTag(it, categories, kind) }
                 ?.takeUnless { it == CategoryIds.BILLS && byRules == CategoryIds.SUBSCRIPTIONS }

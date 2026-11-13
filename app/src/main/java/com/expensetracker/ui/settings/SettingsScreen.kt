@@ -122,12 +122,11 @@ fun SettingsScreen(onOpenCategories: () -> Unit, viewModel: SettingsViewModel = 
             AppCard(contentPadding = PaddingValues(vertical = 6.dp)) {
                 SettingRow(
                     Icons.Rounded.UploadFile,
-                    "Import Paytm statement",
+                    "Import a statement",
                     if (importState == SettingsViewModel.ImportState.Running) {
                         "Importing…"
                     } else {
-                        "Add payments that had no SMS, like UPI Lite. In Paytm: Balance & History → " +
-                            "Download UPI Statement → Excel."
+                        "Add payments from a Paytm or bank statement (Excel or CSV)."
                     },
                 ) { importLauncher.launch(STATEMENT_TYPES) }
                 RowDivider()
@@ -169,13 +168,14 @@ fun SettingsScreen(onOpenCategories: () -> Unit, viewModel: SettingsViewModel = 
 
     when (val state = importState) {
         is SettingsViewModel.ImportState.Done -> ImportResultDialog(
-            title = "Paytm statement imported",
+            title = "Statement imported",
             message = importSummary(state.report),
             onDismiss = viewModel::dismissImportResult,
         )
         is SettingsViewModel.ImportState.Failed -> ImportResultDialog(
             title = "Couldn't import this file",
-            message = state.message + "\n\nIn Paytm, go to Balance & History → Download UPI Statement and choose Excel.",
+            message = state.message + "\n\nPaytm: Balance & History → Download UPI Statement → Excel.\n" +
+                "SBI: net banking → Account Statement → Excel.",
             onDismiss = viewModel::dismissImportResult,
         )
         else -> Unit
@@ -188,6 +188,8 @@ private val STATEMENT_TYPES = arrayOf(
     "application/vnd.ms-excel",
     "text/csv",
     "text/comma-separated-values",
+    "text/tab-separated-values",
+    "text/plain",
     "application/octet-stream",
 )
 
